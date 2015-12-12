@@ -7,7 +7,7 @@ MathPresso is a C++ library designed to parse mathematical expressions and compi
 
 This is an updated version of MathPresso that works with a new AsmJit library and uses double-precision floating points. It has many bugs fixed compared to the last version on google-code and contains improvements that can make execution of certain built-in functions faster if the host CPU supports SSE4.1 (rounding, modulo).
 
-This version of MathPresso is currently not completely up-to-date with its forks called DoublePresso. Pull request that add functionality contained there and fixes bugs are welcome.
+This version of MathPresso is currently not completely up-to-date with its forks called DoublePresso. Pull request that add functionality contained there and bugs fixes are welcome.
 
 This is also a transitional version that is available to users that want to use MathPresso and cannot wait for the new MPSL engine, which is a work in progress.
 
