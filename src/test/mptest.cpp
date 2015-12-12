@@ -29,14 +29,22 @@ struct TestExpression {
 # undef max
 #endif // max
 
-inline double min(double x, double y) { return x < y ? x : y; }
-inline double max(double x, double y) { return x > y ? x : y; }
+namespace environment {
+  const double E  = 2.7182818284590452354;
+  const double PI = 3.14159265358979323846;
+
+  inline double min(double x, double y) { return x < y ? x : y; }
+  inline double max(double x, double y) { return x > y ? x : y; }
+}
 
 int main(int argc, char* argv[]) {
+  using namespace environment;
+
+  bool failed = false;
+
   double x = 5.1;
   double y = 6.7;
   double z = 9.9;
-  double PI = 3.14159265358979323846;
 
   mathpresso::Context ctx;
   mathpresso::Expression e0;
@@ -60,15 +68,14 @@ int main(int argc, char* argv[]) {
     TEST_EXPRESSION( x*z - y*z),
     TEST_EXPRESSION( x*z*y*z),
     TEST_EXPRESSION( x*z/y*z),
-    TEST_EXPRESSION( sin(x) * cos(y) * tan(z) ),
-    TEST_EXPRESSION( min(x, y) ),
-    TEST_EXPRESSION( max(x, y) ),
     TEST_EXPRESSION( x == y ),
     TEST_EXPRESSION( x != y ),
     TEST_EXPRESSION( x <  y ),
     TEST_EXPRESSION( x <= y ),
     TEST_EXPRESSION( x >  y ),
     TEST_EXPRESSION( x >= y ),
+    TEST_EXPRESSION( x + y == y - z ),
+    TEST_EXPRESSION( x > y == y < z ),
     TEST_EXPRESSION( -x ),
     TEST_EXPRESSION( -1 + x ),
     TEST_EXPRESSION( -(-(-1)) ),
@@ -80,36 +87,53 @@ int main(int argc, char* argv[]) {
     TEST_EXPRESSION( (x+y+z*2+(x*z+z*1.5)) ),
     TEST_EXPRESSION( (((((((x-0.28)+y)+x)+x)*x)/1.12)*y) ),
     TEST_EXPRESSION( ((((x*((((y-1.50)+1.82)-x)/PI))/x)*x)+z) ),
-    TEST_EXPRESSION( (((((((((x+1.35)+PI)/PI)-y)+z)-z)+y)/x)+0.81) )
+    TEST_EXPRESSION( (((((((((x+1.35)+PI)/PI)-y)+z)-z)+y)/x)+0.81) ),
+    TEST_EXPRESSION( round(x) ),
+    TEST_EXPRESSION( round(-x) ),
+    TEST_EXPRESSION( floor(x) ),
+    TEST_EXPRESSION( floor(-x) ),
+    TEST_EXPRESSION( ceil(x) ),
+    TEST_EXPRESSION( ceil(-x) ),
+    TEST_EXPRESSION( min(x, y) ),
+    TEST_EXPRESSION( max(x, y) ),
+    TEST_EXPRESSION( sin(x) * cos(y) * tan(z) )
   };
 
   for (int i = 0; i < TABLE_SIZE(tests); i++) {
-    printf("EXP: %s\n", tests[i].expression);
+    const char* exp = tests[i].expression;
+    int err;
 
-    if (e0.create(ctx, tests[i].expression, mathpresso::kMPOptionDisableJIT) != mathpresso::kMPResultOk) {
-      printf("     Failure: Compilation error (no-jit).\n");
+    if ((err = e0.create(ctx, exp, mathpresso::kMPOptionDisableJIT))) {
+      printf("[Failure]: \"%s\" (eval)\n", exp);
+      printf("           ERROR %d (jit disabled).\n", err);
       continue;
     }
 
-    if (e1.create(ctx, tests[i].expression, mathpresso::kMPOptionNone) != mathpresso::kMPResultOk) {
-      printf("     Failure: Compilation error (use-jit).\n");
+    if ((err = e1.create(ctx, exp, mathpresso::kMPOptionNone))) {
+      printf("[Failure]: \"%s\" (jit)\n", exp);
+      printf("           ERROR %d (jit enabled).\n", err);
       continue;
     }
 
+    double expected = tests[i].expected;
     double res0 = e0.evaluate(variables);
     double res1 = e1.evaluate(variables);
-    double expected = tests[i].expected;
 
-    const char* msg0 = res0 == expected ? "Ok" : "Failure";
-    const char* msg1 = res1 == expected ? "Ok" : "Failure";
+    if (res0 != expected) {
+      printf("[Failure]: \"%s\" (eval)\n", exp);
+      printf("           result(%f) != expected(%f)\n", res0, expected);
+      failed = true;
+    }
 
-    printf(
-      "     expected=%f\n"
-      "     eval    =%f (%s)\n"
-      "     jit     =%f (%s)\n"
-      "\n",
-      expected, res0, msg0, res1, msg1);
+    else if (res1 != expected) {
+      printf("[Failure]: \"%s\" (jit)\n", exp);
+      printf("           result(%f) != expected(%f)\n", res1, expected);
+      failed = true;
+    }
+    else {
+      printf("[Success]: \"%s\" -> %f\n", exp, expected);
+    }
   }
 
-  return 0;
+  return failed ? 1 : 0;
 }

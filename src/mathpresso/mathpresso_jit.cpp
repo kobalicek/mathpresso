@@ -293,13 +293,13 @@ MPJITVar MPJITCompiler::onOperator(ASTBinaryOp* node) {
   int predicate = 0;
 
   switch (operatorType) {
-    case kMPOpEq: predicate = asmjit::kX86CmpEQ ; goto compare;
-    case kMPOpNe: predicate = asmjit::kX86CmpNEQ; goto compare;
-    case kMPOpGt: predicate = asmjit::kX86CmpNLE; goto compare;
-    case kMPOpGe: predicate = asmjit::kX86CmpNLT; goto compare;
-    case kMPOpLt: predicate = asmjit::kX86CmpLT ; goto compare;
-    case kMPOpLe: predicate = asmjit::kX86CmpLE ; goto compare;
-compare:
+    case kMPOpEq: predicate = asmjit::kX86CmpEQ ; goto emitCompare;
+    case kMPOpNe: predicate = asmjit::kX86CmpNEQ; goto emitCompare;
+    case kMPOpGt: predicate = asmjit::kX86CmpNLE; goto emitCompare;
+    case kMPOpGe: predicate = asmjit::kX86CmpNLT; goto emitCompare;
+    case kMPOpLt: predicate = asmjit::kX86CmpLT ; goto emitCompare;
+    case kMPOpLe: predicate = asmjit::kX86CmpLE ; goto emitCompare;
+emitCompare:
       c->emit(asmjit::kX86InstIdCmpsd, vl.getOperand(), vr.getOperand(), predicate);
       c->emit(asmjit::kX86InstIdAndpd, vl.getOperand(), getConstantD64AsPD(1.0).getOperand());
       return vl;
@@ -339,6 +339,7 @@ MPJITVar MPJITCompiler::onCall(ASTCall* node) {
   
   Function* fn = node->getFunction();
   int funcId = fn->getFunctionId();
+  int predicate = 0;
 
   switch (funcId) {
     // Intrinsics.
@@ -397,8 +398,24 @@ MPJITVar MPJITCompiler::onCall(ASTCall* node) {
       return u;
     }
 
+    case kMPFunctionFloor: predicate = asmjit::kX86RoundDown   ; goto emitRound;
+    case kMPFunctionRound: predicate = asmjit::kX86RoundCurrent; goto emitRound;
+    case kMPFunctionCeil : predicate = asmjit::kX86RoundUp     ; goto emitRound;
+emitRound: {
+      if (!asmjit::X86CpuInfo::getHost()->hasFeature(asmjit::kX86CpuFeatureSSE4_1))
+        goto emitCall;
+
+      MPJITVar dst(c->newXmmSd(), MPJITVar::FLAG_NONE);
+      MPJITVar src(onNode(arguments[0]));
+
+      c->emit(asmjit::kX86InstIdRoundsd, dst.getOperand(), src.getOperand(), predicate);
+      return dst;
+    }
+
     // Function call.
-    default: {
+    default:
+emitCall:
+    {
       asmjit::XmmVar args[8];
       MPJITVar result(c->newXmmSd(), MPJITVar::FLAG_NONE);
 
