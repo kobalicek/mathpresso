@@ -13,7 +13,7 @@
 
 namespace mathpresso {
 
-MATHPRESSO_NOAPI MPEvalFunc mpCompileFunction(WorkContext& ctx, ASTNode* tree);
+MATHPRESSO_NOAPI MPEvalFunc mpCompileFunction(WorkContext& ctx, ASTNode* tree, bool dumpJIT);
 MATHPRESSO_NOAPI void mpFreeFunction(void* fn);
 
 } // mathpresso namespace

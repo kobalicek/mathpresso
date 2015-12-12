@@ -139,7 +139,7 @@ double ASTVariable::evaluate(void* data) const {
 ASTUnaryOp::ASTUnaryOp(unsigned int nodeId)
   : ASTNode(nodeId, kMPNodeUnaryOp),
     _child(NULL),
-    _unaryType(kMPUnaryOpNone) {}
+    _unaryType(kMPOpNone) {}
 
 ASTUnaryOp::~ASTUnaryOp() {
   if (_child)
@@ -162,9 +162,9 @@ double ASTUnaryOp::evaluate(void* data) const {
   double value = getChild()->evaluate(data);
 
   switch (getUnaryType()) {
-    case kMPUnaryOpNone:
+    case kMPOpNone:
       return value;
-    case kMPUnaryOpNegate:
+    case kMPOpNegate:
       return -value;
     default:
       MP_ASSERT_NOT_REACHED();
@@ -203,26 +203,27 @@ double ASTBinaryOp::evaluate(void* data) const {
   double result;
 
   switch (getBinaryType()) {
-    case kMPBinaryOpAssign: {
+    case kMPOpAssign: {
       MP_ASSERT(_left->getNodeType() == kMPNodeVariable);
       result = _right->evaluate(data);
       reinterpret_cast<double*>((char*)data +
         reinterpret_cast<ASTVariable*>(_left)->getOffset())[0] = result;
       break;
     }
-    case kMPBinaryOpAdd:
-      result = _left->evaluate(data) + _right->evaluate(data);
-      break;
-    case kMPBinaryOpSub:
-      result = _left->evaluate(data) - _right->evaluate(data);
-      break;
-    case kMPBinaryOpMul:
-      result = _left->evaluate(data) * _right->evaluate(data);
-      break;
-    case kMPBinaryOpDiv:
-      result = _left->evaluate(data) / _right->evaluate(data);
-      break;
-    case kMPBinaryOpMod: {
+
+    case kMPOpEq : result = static_cast<double>(_left->evaluate(data) == _right->evaluate(data)); break;
+    case kMPOpNe : result = static_cast<double>(_left->evaluate(data) != _right->evaluate(data)); break;
+    case kMPOpGt : result = static_cast<double>(_left->evaluate(data) >  _right->evaluate(data)); break;
+    case kMPOpGe : result = static_cast<double>(_left->evaluate(data) >= _right->evaluate(data)); break;
+    case kMPOpLt : result = static_cast<double>(_left->evaluate(data) <  _right->evaluate(data)); break;
+    case kMPOpLe : result = static_cast<double>(_left->evaluate(data) <= _right->evaluate(data)); break;
+
+    case kMPOpAdd: result = _left->evaluate(data) + _right->evaluate(data); break;
+    case kMPOpSub: result = _left->evaluate(data) - _right->evaluate(data); break;
+    case kMPOpMul: result = _left->evaluate(data) * _right->evaluate(data); break;
+    case kMPOpDiv: result = _left->evaluate(data) / _right->evaluate(data); break;
+
+    case kMPOpMod: {
       double vl = _left->evaluate(data);
       double vr = _right->evaluate(data);
       result = fmod(vl, vr);

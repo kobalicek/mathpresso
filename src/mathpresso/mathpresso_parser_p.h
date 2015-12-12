@@ -35,7 +35,7 @@ struct MATHPRESSO_NOAPI MPParser {
   //! Parse single expression, terminating on right paren or semicolon.
   MPResult parseExpression(ASTNode** dst,
     ASTNode* _left,
-    int minPriority,
+    uint maxPriority,
     bool isInsideExpression);
 
 protected:

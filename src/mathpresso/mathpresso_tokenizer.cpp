@@ -31,8 +31,7 @@ uint MPTokenizer::next(MPToken* dst) {
   while (cur != end && mpIsSpace(*cur)) *cur++;
 
   // End of input.
-  if (cur == end)
-  {
+  if (cur == end) {
     dst->pos = (size_t)(cur - beg);
     dst->len = 0;
     dst->tokenType = kMPTokenEOI;
@@ -95,25 +94,69 @@ uint MPTokenizer::next(MPToken* dst) {
 
   // Parse operators, parenthesis, etc...
   else {
+    uint tokenType = kMPTokenError;
     cur++;
+
+    switch (uc) {
+      case ',': tokenType = kMPTokenComma; break;
+      case '(': tokenType = kMPTokenLParen; break;
+      case ')': tokenType = kMPTokenRParen; break;
+      case ';': tokenType = kMPTokenSemicolon; break;
+      case '+': tokenType = kMPTokenAdd; break;
+      case '-': tokenType = kMPTokenSub; break;
+      case '*': tokenType = kMPTokenMul; break;
+      case '/': tokenType = kMPTokenDiv; break;
+      case '%': tokenType = kMPTokenMod; break;
+
+      case '=':
+        if (cur != end && cur[0] == '=') {
+          cur++;
+          tokenType = kMPTokenEq;
+        }
+        else {
+          tokenType = kMPTokenAssign;
+        }
+        break;
+
+      case '!':
+        if (cur != end && cur[0] == '=') {
+          cur++;
+          tokenType = kMPTokenNe;
+        }
+        else {
+          tokenType = kMPTokenError;
+        }
+        break;
+
+      case '>':
+        if (cur != end && cur[0] == '=') {
+          cur++;
+          tokenType = kMPTokenGe;
+        }
+        else {
+          tokenType = kMPTokenGt;
+        }
+        break;
+
+      case '<':
+        if (cur != end && cur[0] == '=') {
+          cur++;
+          tokenType = kMPTokenLe;
+        }
+        else {
+          tokenType = kMPTokenLt;
+        }
+        break;
+
+      default:
+        tokenType = kMPTokenError;
+        break;
+    }
 
     dst->pos = (size_t)(first - beg);
     dst->len = (size_t)(cur - first);
 
-    switch (uc) {
-      case ',': dst->tokenType = kMPTokenComma; break;
-      case '(': dst->tokenType = kMPTokenLParen; break;
-      case ')': dst->tokenType = kMPTokenRParen; break;
-      case ';': dst->tokenType = kMPTokenSemicolon; break;
-      case '=': dst->tokenType = kMPTokenOperator; dst->operatorType = kMPBinaryOpAssign; break;
-      case '+': dst->tokenType = kMPTokenOperator; dst->operatorType = kMPBinaryOpAdd; break;
-      case '-': dst->tokenType = kMPTokenOperator; dst->operatorType = kMPBinaryOpSub; break;
-      case '*': dst->tokenType = kMPTokenOperator; dst->operatorType = kMPBinaryOpMul; break;
-      case '/': dst->tokenType = kMPTokenOperator; dst->operatorType = kMPBinaryOpDiv; break;
-      case '%': dst->tokenType = kMPTokenOperator; dst->operatorType = kMPBinaryOpMod; break;
-      default : dst->tokenType = kMPTokenError; break;
-    }
-
+    dst->tokenType = tokenType;
     return dst->tokenType;
   }
 

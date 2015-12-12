@@ -41,22 +41,25 @@ enum MPVariableType {
 //! \internal
 //!
 //! Unary operator type.
-enum MPUnaryOpType {
-  kMPUnaryOpNone,
-  kMPUnaryOpNegate
-};
+enum MPOpType {
+  kMPOpNone,
 
-//! \internal
-//!
-//! Binary operator type.
-enum MPBinaryOpType {
-  kMPBinaryOpNone,
-  kMPBinaryOpAssign,
-  kMPBinaryOpAdd,
-  kMPBinaryOpSub,
-  kMPBinaryOpMul,
-  kMPBinaryOpDiv,
-  kMPBinaryOpMod
+  // Unary.
+  kMPOpNegate,
+
+  // Binary.
+  kMPOpAssign,
+  kMPOpEq,
+  kMPOpNe,
+  kMPOpGt,
+  kMPOpGe,
+  kMPOpLt,
+  kMPOpLe,
+  kMPOpAdd,
+  kMPOpSub,
+  kMPOpMul,
+  kMPOpDiv,
+  kMPOpMod
 };
 
 //! \internal

@@ -113,7 +113,9 @@ enum MPOptions {
   //! No options.
   kMPOptionNone = 0x00000000,
   //! Disable JIT compiler.
-  kMPOptionDisableJIT = 0x00000001
+  kMPOptionDisableJIT = 0x00000001,
+  //! Print JIT code generated.
+  kMPOptionDumpJIT = 0x00000002
 };
 
 // ============================================================================

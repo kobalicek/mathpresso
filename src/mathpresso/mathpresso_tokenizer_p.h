@@ -22,14 +22,25 @@ namespace mathpresso {
 enum MPTokenType {
   kMPTokenError,
   kMPTokenEOI,
+  kMPTokenInt,
+  kMPTokenDouble,
+  kMPTokenSymbol,
   kMPTokenComma,
   kMPTokenSemicolon,
   kMPTokenLParen,
   kMPTokenRParen,
-  kMPTokenOperator,
-  kMPTokenInt,
-  kMPTokenDouble,
-  kMPTokenSymbol
+  kMPTokenAssign,
+  kMPTokenEq,
+  kMPTokenNe,
+  kMPTokenGt,
+  kMPTokenGe,
+  kMPTokenLt,
+  kMPTokenLe,
+  kMPTokenAdd,
+  kMPTokenSub,
+  kMPTokenMul,
+  kMPTokenDiv,
+  kMPTokenMod
 };
 
 // ============================================================================
@@ -45,10 +56,7 @@ struct MPToken {
   uint tokenType;
 
   // Token value.
-  union {
-    int operatorType;
-    double value;
-  };
+  double value;
 };
 
 // ============================================================================

@@ -21,6 +21,17 @@ struct TestExpression {
 #define TEST_EXPRESSION(expression) \
   { #expression, (double)(expression) }
 
+#if defined(min)
+ #undef min
+#endif // min
+
+#if defined(max)
+# undef max
+#endif // max
+
+inline double min(double x, double y) { return x < y ? x : y; }
+inline double max(double x, double y) { return x > y ? x : y; }
+
 int main(int argc, char* argv[]) {
   double x = 5.1;
   double y = 6.7;
@@ -39,9 +50,25 @@ int main(int argc, char* argv[]) {
   double variables[] = { x, y, z };
 
   TestExpression tests[] = {
-    TEST_EXPRESSION( (x+y) ),
-    TEST_EXPRESSION( -x ),
+    TEST_EXPRESSION( x+y ),
+    TEST_EXPRESSION( x-y ),
+    TEST_EXPRESSION( x*y ),
+    TEST_EXPRESSION( x/y ),
     TEST_EXPRESSION( -(x+y) ),
+    TEST_EXPRESSION( -(x-y) ),
+    TEST_EXPRESSION( x*z + y*z),
+    TEST_EXPRESSION( x*z - y*z),
+    TEST_EXPRESSION( x*z*y*z),
+    TEST_EXPRESSION( x*z/y*z),
+    TEST_EXPRESSION( sin(x) * cos(y) * tan(z) ),
+    TEST_EXPRESSION( min(x, y) ),
+    TEST_EXPRESSION( max(x, y) ),
+    TEST_EXPRESSION( x == y ),
+    TEST_EXPRESSION( x != y ),
+    TEST_EXPRESSION( x <  y ),
+    TEST_EXPRESSION( x <= y ),
+    TEST_EXPRESSION( x >  y ),
+    TEST_EXPRESSION( x >= y ),
     TEST_EXPRESSION( -x ),
     TEST_EXPRESSION( -1 + x ),
     TEST_EXPRESSION( -(-(-1)) ),
@@ -73,8 +100,8 @@ int main(int argc, char* argv[]) {
     double res1 = e1.evaluate(variables);
     double expected = tests[i].expected;
 
-    const char* msg0 = fabs(res0 - expected) < 0.001 ? "Ok" : "Failure";
-    const char* msg1 = fabs(res1 - expected) < 0.001 ? "Ok" : "Failure";
+    const char* msg0 = res0 == expected ? "Ok" : "Failure";
+    const char* msg1 = res1 == expected ? "Ok" : "Failure";
 
     printf(
       "     expected=%f\n"

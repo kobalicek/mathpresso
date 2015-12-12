@@ -115,6 +115,7 @@ struct MATHPRESSO_NOAPI MPJITCompiler {
   MPJITVar getConstantI64(int64_t value);
   MPJITVar getConstantI64AsPD(int64_t value);
   MPJITVar getConstantD64(double value);
+  MPJITVar getConstantD64AsPD(double value);
 
   // Members.
   WorkContext& ctx;
@@ -225,16 +226,16 @@ MPJITVar MPJITCompiler::onVariable(ASTVariable* node) {
 }
 
 MPJITVar MPJITCompiler::onUnary(ASTUnaryOp* node) {
-  uint transformType = node->getUnaryType();
+  uint op = node->getUnaryType();
   MPJITVar var = onNode(node->getChild());
 
-  if (transformType != kMPUnaryOpNone)
+  if (op != kMPOpNone)
     var = writableVar(var);
 
-  switch (transformType) {
-    case kMPUnaryOpNone:
+  switch (op) {
+    case kMPOpNone:
       break;
-    case kMPUnaryOpNegate: {
+    case kMPOpNegate: {
       asmjit::XmmVar t(c->newXmmSd());
       c->emit(asmjit::kX86InstIdXorpd, var.getOperand(), getConstantI64AsPD(ASMJIT_UINT64_C(0x8000000000000000)).getOperand());
       break;
@@ -246,13 +247,14 @@ MPJITVar MPJITCompiler::onUnary(ASTUnaryOp* node) {
 
 MPJITVar MPJITCompiler::onOperator(ASTBinaryOp* node) {
   uint operatorType = node->getBinaryType();
+
   MPJITVar vl;
   MPJITVar vr;
 
   ASTNode* left  = node->getLeft();
   ASTNode* right = node->getRight();
 
-  if (operatorType == kMPBinaryOpAssign) {
+  if (operatorType == kMPOpAssign) {
     ASTVariable* varNode = reinterpret_cast<ASTVariable*>(left);
     MP_ASSERT(varNode->getNodeType() == kMPNodeVariable);
 
@@ -281,29 +283,50 @@ MPJITVar MPJITCompiler::onOperator(ASTBinaryOp* node) {
     vr = onNode(node->getRight());
 
     // Commutativity (PLUS and MUL operators).
-    if (operatorType == kMPBinaryOpAdd || operatorType == kMPBinaryOpMul) {
+    if (operatorType == kMPOpAdd || operatorType == kMPOpMul) {
       if (vl.isRO() && !vr.isRO()) vl.swapWith(vr);
     }
 
     vl = writableVar(vl);
   }
 
+  int predicate = 0;
+
   switch (operatorType) {
-    case kMPBinaryOpAdd:
-      c->emit(asmjit::kX86InstIdAddsd, vl.getOperand(), vr.getOperand());
+    case kMPOpEq: predicate = asmjit::kX86CmpEQ ; goto compare;
+    case kMPOpNe: predicate = asmjit::kX86CmpNEQ; goto compare;
+    case kMPOpGt: predicate = asmjit::kX86CmpNLE; goto compare;
+    case kMPOpGe: predicate = asmjit::kX86CmpNLT; goto compare;
+    case kMPOpLt: predicate = asmjit::kX86CmpLT ; goto compare;
+    case kMPOpLe: predicate = asmjit::kX86CmpLE ; goto compare;
+compare:
+      c->emit(asmjit::kX86InstIdCmpsd, vl.getOperand(), vr.getOperand(), predicate);
+      c->emit(asmjit::kX86InstIdAndpd, vl.getOperand(), getConstantD64AsPD(1.0).getOperand());
       return vl;
-    case kMPBinaryOpSub:
-      c->emit(asmjit::kX86InstIdSubsd, vl.getOperand(), vr.getOperand());
+
+    case kMPOpAdd: c->emit(asmjit::kX86InstIdAddsd, vl.getOperand(), vr.getOperand()); return vl;
+    case kMPOpSub: c->emit(asmjit::kX86InstIdSubsd, vl.getOperand(), vr.getOperand()); return vl;
+    case kMPOpMul: c->emit(asmjit::kX86InstIdMulsd, vl.getOperand(), vr.getOperand()); return vl;
+    case kMPOpDiv: c->emit(asmjit::kX86InstIdDivsd, vl.getOperand(), vr.getOperand()); return vl;
+
+    case kMPOpMod: {
+      asmjit::XmmVar args[8];
+      MPJITVar result(c->newXmmSd(), MPJITVar::FLAG_NONE);
+
+      // Create the function call.
+      asmjit::X86CallNode* ctx = c->call((asmjit::Ptr)(MFunc_Ret_D_ARG2)fmod, 
+        asmjit::FuncBuilder2<double, double, double>(asmjit::kCallConvHostCDecl));
+
+      vl = registerVar(vl);
+      vr = registerVar(vr);
+
+      ctx->setArg(0, vl.getXmm());
+      ctx->setArg(1, vr.getXmm());
+
+      ctx->setRet(0, vl.getXmm());
       return vl;
-    case kMPBinaryOpMul:
-      c->emit(asmjit::kX86InstIdMulsd, vl.getOperand(), vr.getOperand());
-      return vl;
-    case kMPBinaryOpDiv:
-      c->emit(asmjit::kX86InstIdDivsd, vl.getOperand(), vr.getOperand());
-      return vl;
-    case kMPBinaryOpMod:
-      // TODO: Modulo.
-      return vl;
+    }
+
     default:
       MP_ASSERT_NOT_REACHED();
       return vl;
@@ -452,14 +475,18 @@ MPJITVar MPJITCompiler::getConstantD64(double value) {
   return getConstantI64(u.i64);
 }
 
-MPEvalFunc mpCompileFunction(WorkContext& ctx, ASTNode* tree) {
-  bool enableLogger = true;
+MPJITVar MPJITCompiler::getConstantD64AsPD(double value) {
+  DoubleBits u;
+  u.d64 = value;
+  return getConstantI64AsPD(u.i64);
+}
 
+MPEvalFunc mpCompileFunction(WorkContext& ctx, ASTNode* tree, bool dumpJIT) {
   asmjit::StringLogger logger;
   asmjit::X86Assembler a(&jitGlobal.runtime);
   asmjit::X86Compiler c(&a);
 
-  if (enableLogger) {
+  if (dumpJIT) {
     logger.setOption(asmjit::kLoggerOptionBinaryForm, true);
     a.setLogger(&logger);
   }
@@ -472,7 +499,7 @@ MPEvalFunc mpCompileFunction(WorkContext& ctx, ASTNode* tree) {
   c.finalize();
   MPEvalFunc fn = asmjit_cast<MPEvalFunc>(a.make());
 
-  if (enableLogger) {
+  if (dumpJIT) {
     const char* content = logger.getString();
     printf("%s\n", content);
   }

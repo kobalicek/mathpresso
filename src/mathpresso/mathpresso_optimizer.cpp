@@ -59,7 +59,7 @@ ASTNode* MPOptimizer::onUnaryOp(ASTUnaryOp* node) {
     // Simplify "-(-(x))" to "x".
     if (child->isUnaryOp()) {
       ASTUnaryOp* u = static_cast<ASTUnaryOp*>(child);
-      if (node->getUnaryType() == kMPUnaryOpNegate && u->getUnaryType() == kMPUnaryOpNegate) {
+      if (node->getUnaryType() == kMPOpNegate && u->getUnaryType() == kMPOpNegate) {
         ASTNode* replacement = u->getChild();
         u->resetChild();
         replacement->_parent = node->getParent();
@@ -117,10 +117,10 @@ ASTNode* MPOptimizer::onBinaryOp(ASTBinaryOp* node) {
 
       // Hardcoded evaluator (we accept only ADD and MUL operators).
       switch (node->getBinaryType()) {
-        case kMPBinaryOpAdd:
+        case kMPOpAdd:
           result = c->evaluate(NULL) + y->evaluate(NULL);
           break;
-        case kMPBinaryOpMul:
+        case kMPOpMul:
           result = c->evaluate(NULL) * y->evaluate(NULL);
           break;
         default:
@@ -176,8 +176,8 @@ ASTNode* MPOptimizer::findConstNode(ASTNode* _node, int op) {
   int op0 = op;
   int op1 = node->getBinaryType();
 
-  if ((op0 == kMPBinaryOpAdd && op1 == kMPBinaryOpAdd) ||
-      (op0 == kMPBinaryOpMul && op1 == kMPBinaryOpMul)) {
+  if ((op0 == kMPOpAdd && op1 == kMPOpAdd) ||
+      (op0 == kMPOpMul && op1 == kMPOpMul)) {
     ASTNode* left = node->getLeft();
     ASTNode* right = node->getRight();
 

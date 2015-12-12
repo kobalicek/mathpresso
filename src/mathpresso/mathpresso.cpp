@@ -336,7 +336,7 @@ MPResult Expression::create(const Context& ectx, const char* expression, int opt
   if (options & kMPOptionDisableJIT)
     _evaluate = NULL;
   else
-    _evaluate = mpCompileFunction(ctx, ast);
+    _evaluate = mpCompileFunction(ctx, ast, (options & kMPOptionDumpJIT) != 0);
 
   // Fallback to evaluation if JIT compiling failed or not enabled.
   if (_evaluate == NULL) {

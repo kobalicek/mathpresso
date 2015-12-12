@@ -23,15 +23,48 @@ namespace mathpresso {
 //! \internal
 //!
 //! Operator priority.
-static const int mpOperatorPriority[] = {
-  0 , // kMPBinaryOpNone
-  5 , // kMPBinaryOpAssign
-  10, // kMPBinaryOpAdd
-  10, // kMPBinaryOpSub
-  15, // kMPBinaryOpMul
-  15, // kMPBinaryOpDiv
-  15  // kMPBinaryOpMod
+static const uint mpOperatorPriority[] = {
+  0 , // kMPOpNone
+  3 , // kMPOpNegate
+  15, // kMPOpAssign
+  9 , // kMPOpEq
+  9 , // kMPOpNe
+  8 , // kMPOpGt
+  8 , // kMPOpGe
+  8 , // kMPOpLt
+  8 , // kMPOpLe
+  6 , // kMPOpAdd
+  6 , // kMPOpSub
+  5 , // kMPOpMul
+  5 , // kMPOpDiv
+  5   // kMPOpMod
 };
+
+static const uint mpTokenToOperator[] = {
+  kMPOpNone  , // kMPTokenError
+  kMPOpNone  , // kMPTokenEOI
+  kMPOpNone  , // kMPTokenInt
+  kMPOpNone  , // kMPTokenDouble
+  kMPOpNone  , // kMPTokenSymbol
+  kMPOpNone  , // kMPTokenComma
+  kMPOpNone  , // kMPTokenSemicolon
+  kMPOpNone  , // kMPTokenLParen
+  kMPOpNone  , // kMPTokenRParen
+  kMPOpAssign, // kMPTokenAssign
+  kMPOpEq    , // kMPTokenEq
+  kMPOpNe    , // kMPTokenNe
+  kMPOpGt    , // kMPTokenGt
+  kMPOpGe    , // kMPTokenGe
+  kMPOpLt    , // kMPTokenLt
+  kMPOpLe    , // kMPTokenLe
+  kMPOpAdd   , // kMPTokenAdd
+  kMPOpSub   , // kMPTokenSub
+  kMPOpMul   , // kMPTokenMul
+  kMPOpDiv   , // kMPTokenDiv
+  kMPOpMod   , // kMPTokenMod
+};
+
+enum { kDefaultPriority = 0xFF };
 
 MPParser::MPParser(WorkContext& ctx, const char* input, size_t length)
   : _ctx(ctx),
@@ -49,7 +82,7 @@ MPResult MPParser::parseTree(ASTNode** dst) {
   for (;;)
   {
     ASTNode* ast = NULL;
-    if ((result = parseExpression(&ast, NULL, 0, false)) != kMPResultOk)
+    if ((result = parseExpression(&ast, NULL, kDefaultPriority, false)) != kMPResultOk)
       goto failed;
     if (ast) nodes.append(ast);
 
@@ -93,18 +126,18 @@ failed:
 
 MPResult MPParser::parseExpression(ASTNode** dst,
   ASTNode* _left,
-  int minPriority,
+  uint maxPriority,
   bool isInsideExpression) {
 
   ASTNode* left = _left;
   ASTNode* right = NULL;
 
   MPResult result = kMPResultOk;
-  uint op = kMPBinaryOpNone;
-  uint om = kMPBinaryOpNone;
+  uint op = kMPOpNone;
+  uint om = kMPOpNone;
 
   MPToken& token = _last;
-  MPToken helper;
+  uint tokenOp = kMPOpNone;
 
   for (;;) {
     _tokenizer.next(&token);
@@ -130,7 +163,7 @@ MPResult MPParser::parseExpression(ASTNode** dst,
 
       // ----------------------------------------------------------------------
       case kMPTokenEOI:
-        if (op != kMPBinaryOpNone) {
+        if (op != kMPOpNone) {
           // Expecting expression.
           result = kMPResultExpectedExpression;
           goto failure;
@@ -145,14 +178,14 @@ MPResult MPParser::parseExpression(ASTNode** dst,
       case kMPTokenInt:
       case kMPTokenDouble:
         right = new ASTImmediate(_ctx.genId(),
-          om == kMPBinaryOpSub ? -token.value : token.value);
-        om = kMPBinaryOpNone;
+          om == kMPOpSub ? -token.value : token.value);
+        om = kMPOpNone;
         break;
       // ----------------------------------------------------------------------
 
       // ----------------------------------------------------------------------
       case kMPTokenLParen:
-        result = parseExpression(&right, NULL, 0, true);
+        result = parseExpression(&right, NULL, kDefaultPriority, true);
         if (result != kMPResultOk) goto failure;
 
         _tokenizer.next(&token);
@@ -161,20 +194,20 @@ MPResult MPParser::parseExpression(ASTNode** dst,
           goto failure;
         }
 
-        if (om == kMPBinaryOpSub) {
+        if (om == kMPOpSub) {
           ASTUnaryOp* transform = new ASTUnaryOp(_ctx.genId());
-          transform->setUnaryType(kMPUnaryOpNegate);
+          transform->setUnaryType(kMPOpNegate);
           transform->setChild(right);
           right = transform;
         }
 
-        om = kMPBinaryOpNone;
+        om = kMPOpNone;
         break;
       // ----------------------------------------------------------------------
 
       // ----------------------------------------------------------------------
       case kMPTokenRParen:
-        if (op != kMPBinaryOpNone || om != kMPBinaryOpNone) {
+        if (op != kMPOpNone || om != kMPOpNone) {
           result = kMPResultUnexpectedToken;
           goto failure;
         }
@@ -190,8 +223,20 @@ MPResult MPParser::parseExpression(ASTNode** dst,
       // ----------------------------------------------------------------------
 
       // ----------------------------------------------------------------------
-      case kMPTokenOperator:
-        if (token.operatorType == kMPBinaryOpAssign) {
+      case kMPTokenAssign: tokenOp = kMPOpAssign; goto parseOperator;
+      case kMPTokenEq    : tokenOp = kMPOpEq    ; goto parseOperator;
+      case kMPTokenNe    : tokenOp = kMPOpNe    ; goto parseOperator;
+      case kMPTokenGt    : tokenOp = kMPOpGt    ; goto parseOperator;
+      case kMPTokenGe    : tokenOp = kMPOpGe    ; goto parseOperator;
+      case kMPTokenLt    : tokenOp = kMPOpLt    ; goto parseOperator;
+      case kMPTokenLe    : tokenOp = kMPOpLe    ; goto parseOperator;
+      case kMPTokenAdd   : tokenOp = kMPOpAdd   ; goto parseOperator;
+      case kMPTokenSub   : tokenOp = kMPOpSub   ; goto parseOperator;
+      case kMPTokenMul   : tokenOp = kMPOpMul   ; goto parseOperator;
+      case kMPTokenDiv   : tokenOp = kMPOpDiv   ; goto parseOperator;
+      case kMPTokenMod   : tokenOp = kMPOpMod   ; goto parseOperator;
+parseOperator:
+        if (tokenOp == kMPOpAssign) {
           // Assignment inside expression is not allowed.
           if (isInsideExpression) {
             result = kMPResultAssignmentInsideExpression;
@@ -205,16 +250,17 @@ MPResult MPParser::parseExpression(ASTNode** dst,
           }
         }
 
-        if (op == kMPBinaryOpNone && left == NULL) {
-          om = token.operatorType;
-          if (om == kMPBinaryOpAdd || om == kMPBinaryOpSub) continue;
+        if (op == kMPOpNone && left == NULL) {
+          om = tokenOp;
+          if (om == kMPOpAdd || om == kMPOpSub)
+            continue;
 
           result = kMPResultUnexpectedToken;
           goto failure;
         }
 
-        op = token.operatorType;
-        if (mpOperatorPriority[op] < minPriority) {
+        op = tokenOp;
+        if (mpOperatorPriority[op] > maxPriority) {
           _tokenizer.back(&token);
 
           *dst = left;
@@ -274,7 +320,7 @@ MPResult MPParser::parseExpression(ASTNode** dst,
 
             // Expression.
             ASTNode* arg;
-            if ((result = parseExpression(&arg, NULL, 0, true)) != kMPResultOk) {
+            if ((result = parseExpression(&arg, NULL, kDefaultPriority, true)) != kMPResultOk) {
               mpDeleteAll(arguments);
               goto failure;
             }
@@ -309,14 +355,14 @@ MPResult MPParser::parseExpression(ASTNode** dst,
             right = new ASTVariable(_ctx.genId(), var);
         }
 
-        if (om == kMPBinaryOpSub) {
+        if (om == kMPOpSub) {
           ASTUnaryOp* transform = new ASTUnaryOp(_ctx.genId());
-          transform->setUnaryType(kMPUnaryOpNegate);
+          transform->setUnaryType(kMPOpNegate);
           transform->setChild(right);
           right = transform;
         }
 
-        om = kMPBinaryOpNone;
+        om = kMPOpNone;
         break;
       }
       // ----------------------------------------------------------------------
@@ -328,11 +374,18 @@ MPResult MPParser::parseExpression(ASTNode** dst,
     }
 
     if (left) {
-      _tokenizer.peek(&helper);
+      MPToken next;
+      uint nextOp;
 
-      if (helper.tokenType == kMPTokenOperator && mpOperatorPriority[op] < mpOperatorPriority[helper.operatorType]) {
-        result = parseExpression(&right, right, mpOperatorPriority[helper.operatorType], true);
-        if (result != kMPResultOk) { right = NULL; goto failure; }
+      _tokenizer.peek(&next);
+      nextOp = mpTokenToOperator[next.tokenType];
+
+      if (nextOp != kMPOpNone && mpOperatorPriority[op] > mpOperatorPriority[nextOp]) {
+        result = parseExpression(&right, right, mpOperatorPriority[nextOp], true);
+        if (result != kMPResultOk) {
+          right = NULL;
+          goto failure;
+        }
       }
 
       ASTBinaryOp* parent = new ASTBinaryOp(_ctx.genId(), op);
@@ -341,7 +394,7 @@ MPResult MPParser::parseExpression(ASTNode** dst,
 
       left = parent;
       right = NULL;
-      op = kMPBinaryOpNone;
+      op = kMPOpNone;
     }
     else {
       left = right;
