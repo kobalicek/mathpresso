@@ -50,7 +50,7 @@ script:
   - make
   - cd ..
 
-  - ./build/mp_test
+  - ./build/mptest
 
 after_success:
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/mp_test; fi;
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/mptest; fi;

@@ -28,7 +28,8 @@ MPTokenizer::~MPTokenizer() {}
 
 uint MPTokenizer::next(MPToken* dst) {
   // Skip spaces.
-  while (cur != end && mpIsSpace(*cur)) *cur++;
+  while (cur != end && mpIsSpace(*cur))
+    cur++;
 
   // End of input.
   if (cur == end) {

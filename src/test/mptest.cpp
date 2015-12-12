@@ -42,9 +42,12 @@ int main(int argc, char* argv[]) {
 
   bool failed = false;
 
-  double x = 5.1;
-  double y = 6.7;
-  double z = 9.9;
+  // Made volatile so the compiler doesn't optimize evaluation of the
+  // expression into 80-bit FPU registers. Otherwise we will have some
+  // failures.
+  volatile double x = 5.1;
+  volatile double y = 6.7;
+  volatile double z = 9.9;
 
   mathpresso::Context ctx;
   mathpresso::Expression e0;
@@ -101,8 +104,9 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < TABLE_SIZE(tests); i++) {
     const char* exp = tests[i].expression;
-    int err;
+    bool expOk = true;
 
+    int err;
     if ((err = e0.create(ctx, exp, mathpresso::kMPOptionDisableJIT))) {
       printf("[Failure]: \"%s\" (eval)\n", exp);
       printf("           ERROR %d (jit disabled).\n", err);
@@ -122,15 +126,17 @@ int main(int argc, char* argv[]) {
     if (res0 != expected) {
       printf("[Failure]: \"%s\" (eval)\n", exp);
       printf("           result(%f) != expected(%f)\n", res0, expected);
-      failed = true;
+      expOk = false;
     }
 
-    else if (res1 != expected) {
+    if (res1 != expected) {
       printf("[Failure]: \"%s\" (jit)\n", exp);
       printf("           result(%f) != expected(%f)\n", res1, expected);
-      failed = true;
+      expOk = false;
     }
-    else {
+
+    if (!expOk) {
+      failed = true;
       printf("[Success]: \"%s\" -> %f\n", exp, expected);
     }
   }
