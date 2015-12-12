@@ -1,4 +1,4 @@
-MathPresso - Mathematical Expression Evaluator And Jit Compiler
+MathPresso - Mathematical Expression Evaluator And Jit Compiler  
 Copyright (c) 2015, Petr Kobalicek <kobalicek.petr@gmail.com>
 
 This software is provided 'as-is', without any express or implied
