@@ -42,7 +42,7 @@ before_script:
   - mkdir build
   - cd build
   - cmake --version
-  - cmake .. -G"Unix Makefiles" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DASMJIT_DIR=../deps/asmjit -DMATHPRESSO_BUILD_TEST=1
+  - cmake .. -G"Unix Makefiles" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DASMJIT_DIR=deps/asmjit -DMATHPRESSO_BUILD_TEST=1
   - cd ..
 
 script:
