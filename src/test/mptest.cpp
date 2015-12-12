@@ -33,8 +33,11 @@ namespace environment {
   const double E  = 2.7182818284590452354;
   const double PI = 3.14159265358979323846;
 
+  inline double avg(double x, double y) { return (x + y) * 0.5; }
   inline double min(double x, double y) { return x < y ? x : y; }
   inline double max(double x, double y) { return x > y ? x : y; }
+
+  inline double recip(double x) { return 1.0 / x; }
 }
 
 int main(int argc, char* argv[]) {
@@ -97,9 +100,20 @@ int main(int argc, char* argv[]) {
     TEST_EXPRESSION( floor(-x) ),
     TEST_EXPRESSION( ceil(x) ),
     TEST_EXPRESSION( ceil(-x) ),
+    TEST_EXPRESSION( abs(-x) ),
+    TEST_EXPRESSION( sqrt(x) ),
+    TEST_EXPRESSION( recip(x) ),
+    TEST_EXPRESSION( exp(x) ),
+    TEST_EXPRESSION( log(x) ),
+    TEST_EXPRESSION( log10(x) ),
+    TEST_EXPRESSION( sin(x) ),
+    TEST_EXPRESSION( cos(x) ),
+    TEST_EXPRESSION( tan(x) ),
+    TEST_EXPRESSION( sin(x) * cos(y) * tan(z) ),
+    TEST_EXPRESSION( avg(x, y) ),
     TEST_EXPRESSION( min(x, y) ),
     TEST_EXPRESSION( max(x, y) ),
-    TEST_EXPRESSION( sin(x) * cos(y) * tan(z) )
+    TEST_EXPRESSION( pow(x, y) )
   };
 
   for (int i = 0; i < TABLE_SIZE(tests); i++) {
@@ -135,9 +149,11 @@ int main(int argc, char* argv[]) {
       expOk = false;
     }
 
-    if (!expOk) {
-      failed = true;
+    if (expOk) {
       printf("[Success]: \"%s\" -> %f\n", exp, expected);
+    }
+    else {
+      failed = true;
     }
   }
 

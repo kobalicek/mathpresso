@@ -76,6 +76,7 @@ enum MPFunctionType {
   kMPFunctionSqrt,
   kMPFunctionRecip,
 
+  kMPFunctionExp,
   kMPFunctionLog,
   kMPFunctionLog10,
   kMPFunctionSin,

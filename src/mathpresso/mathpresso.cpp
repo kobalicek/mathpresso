@@ -100,10 +100,11 @@ static MPResult Context_addEnvironment_Math(Context* self) {
   MP_ADD_FUNCTION(self, "floor"     , MPFunc1, floor  , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionFloor);
   MP_ADD_FUNCTION(self, "ceil"      , MPFunc1, ceil   , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionCeil);
 
-  MP_ADD_FUNCTION(self, "abs"       , MPFunc1, abs    , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionAbs);
+  MP_ADD_FUNCTION(self, "abs"       , MPFunc1, fabs   , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionAbs);
   MP_ADD_FUNCTION(self, "sqrt"      , MPFunc1, sqrt   , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionSqrt);
   MP_ADD_FUNCTION(self, "recip"     , MPFunc1, mpRecip, kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionRecip);
 
+  MP_ADD_FUNCTION(self, "exp"       , MPFunc1, exp    , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionExp);
   MP_ADD_FUNCTION(self, "log"       , MPFunc1, log    , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionLog);
   MP_ADD_FUNCTION(self, "log10"     , MPFunc1, log10  , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionLog10);
   MP_ADD_FUNCTION(self, "sin"       , MPFunc1, sin    , kMPFuncProtoDoubleDouble1 | kMPFuncSafe, kMPFunctionSin);

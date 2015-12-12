@@ -372,13 +372,15 @@ MPJITVar MPJITCompiler::onCall(ASTCall* node) {
     }
 
     case kMPFunctionRecip: {
+      MP_ASSERT(len == 1);
+
       MPJITVar r(c->newXmmSd(), MPJITVar::FLAG_NONE);
       MPJITVar u(onNode(arguments[0]));
 
-      c->emit(asmjit::kX86InstIdMovsd, getConstantD64(1.0).getOperand());
-      c->emit(asmjit::kX86InstIdDivsd, u.getOperand());
+      c->emit(asmjit::kX86InstIdMovsd, r.getXmm(), getConstantD64(1.0).getOperand());
+      c->emit(asmjit::kX86InstIdDivsd, r.getXmm(), u.getOperand());
 
-      return u;
+      return r;
     }
 
     case kMPFunctionAbs:
@@ -388,7 +390,7 @@ MPJITVar MPJITCompiler::onCall(ASTCall* node) {
       MPJITVar u(writableVar(onNode(arguments[0])));
       switch (funcId) {
         case kMPFunctionAbs:
-          c->emit(asmjit::kX86InstIdAndpd, u.getOperand(), registerVar(getConstantI64AsPD(ASMJIT_UINT64_C(0x8000000000000000))).getOperand());
+          c->emit(asmjit::kX86InstIdAndpd, u.getOperand(), registerVar(getConstantI64AsPD(ASMJIT_UINT64_C(0x7FFFFFFFFFFFFFFF))).getOperand());
           break;
         case kMPFunctionSqrt:
           c->emit(asmjit::kX86InstIdSqrtsd, u.getOperand(), u.getOperand());
@@ -402,6 +404,8 @@ MPJITVar MPJITCompiler::onCall(ASTCall* node) {
     case kMPFunctionRound: predicate = asmjit::kX86RoundCurrent; goto emitRound;
     case kMPFunctionCeil : predicate = asmjit::kX86RoundUp     ; goto emitRound;
 emitRound: {
+      MP_ASSERT(len == 1);
+
       if (!asmjit::X86CpuInfo::getHost()->hasFeature(asmjit::kX86CpuFeatureSSE4_1))
         goto emitCall;
 
