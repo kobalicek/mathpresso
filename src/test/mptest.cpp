@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #define TEST_EXPRESSION(expression) \
@@ -86,7 +87,13 @@ struct TestOutputLog : public mathpresso::OutputLog {
   TestOutputLog() {}
   virtual ~TestOutputLog() {}
   virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
-    printf("[Failure]: %s (at %u)\n", message, column);
+    switch (type) {
+      case kMessageError     : printf("[Failure]: %s (at %u)\n", message, column); break;
+      case kMessageWarning   : printf("[Warning]: %s (at %u)\n", message, column); break;
+      case kMessageAstInitial: printf("[AST-Initial]:\n%s\n", message); break;
+      case kMessageAstFinal  : printf("[AST-Initial]:\n%s\n", message); break;
+      case kMessageAsm       : printf("[Machine-Code]:\n%s\n", message); break;
+    }
   }
 };
 
@@ -108,8 +115,18 @@ struct TestApp {
       big(4503599627370496.0) {
   }
 
+  bool hasArg(const char* arg) {
+    for (int i = 1; i < argc; i++) {
+      if (::strcmp(argv[i], arg) == 0)
+        return true;
+    }
+
+    return false;
+  }
+
   int run() {
     bool failed = false;
+    bool verbose = hasArg("--verbose");
 
     // Set the FPU precision to `double` if running 32-bit. Required
     // to be able to compare the result of C++ code with JIT code.
@@ -249,9 +266,15 @@ struct TestApp {
       TEST_EXPRESSION( pow(x, y) )
     };
 
+    unsigned int defaultOptions = mathpresso::kNoOptions;
+    if (verbose) {
+      defaultOptions |= mathpresso::kOptionVerbose  |
+                        mathpresso::kOptionDebugAsm ;
+    }
+
     TestOption options[] = {
-      "SSE2", mathpresso::kOptionDisableSSE4_1,
-      "BEST", mathpresso::kNoOptions
+      "SSE2", defaultOptions | mathpresso::kOptionDisableSSE4_1,
+      "BEST", defaultOptions
     };
 
     printf("MPTest environment:\n");
@@ -267,8 +290,13 @@ struct TestApp {
 
       for (int j = 0; j < MATHPRESSO_ARRAY_SIZE(options); j++) {
         const TestOption& option = options[j];
-        int err = e.compile(ctx, exp, option.options, &outputLog);
 
+        if (verbose) {
+          printf("[Compile]:\n"
+                 "  \"%s\" (%s)\n", exp, option.name);
+        }
+
+        int err = e.compile(ctx, exp, option.options, &outputLog);
         if (err) {
           printf("[ERROR %u]: \"%s\" (%s)\n", err, exp, option.name);
           allOk = false;
