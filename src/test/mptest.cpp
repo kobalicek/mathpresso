@@ -90,9 +90,9 @@ struct TestOutputLog : public mathpresso::OutputLog {
     switch (type) {
       case kMessageError     : printf("[Failure]: %s (at %u)\n", message, column); break;
       case kMessageWarning   : printf("[Warning]: %s (at %u)\n", message, column); break;
-      case kMessageAstInitial: printf("[AST-Initial]:\n%s\n", message); break;
-      case kMessageAstFinal  : printf("[AST-Initial]:\n%s\n", message); break;
-      case kMessageAsm       : printf("[Machine-Code]:\n%s\n", message); break;
+      case kMessageAstInitial: printf("[AST-Initial]:\n%s", message); break;
+      case kMessageAstFinal  : printf("[AST-Initial]:\n%s", message); break;
+      case kMessageAsm       : printf("[Machine-Code]:\n%s", message); break;
     }
   }
 };
@@ -315,6 +315,8 @@ struct TestApp {
         printf("[Success]: \"%s\" -> %f\n", exp, expected);
       else
         failed = true;
+
+      printf("\n");
     }
 
     return failed ? 1 : 0;
