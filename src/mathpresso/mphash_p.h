@@ -1,0 +1,280 @@
+// [MathPresso]
+// Mathematical Expression Parser and JIT Compiler.
+//
+// [License]
+// Zlib - See LICENSE.md file in the package.
+
+// [Guard]
+#ifndef _MATHPRESSO_MPHASH_P_H
+#define _MATHPRESSO_MPHASH_P_H
+
+// [Dependencies]
+#include "./mpallocator_p.h"
+
+namespace mathpresso {
+
+// ============================================================================
+// [mathpresso::HashUtils]
+// ============================================================================
+
+namespace HashUtils {
+  // \internal
+  static MATHPRESSO_INLINE uint32_t hashPointer(const void* kPtr) {
+    uintptr_t p = (uintptr_t)kPtr;
+    return static_cast<uint32_t>(
+      ((p >> 3) ^ (p >> 7) ^ (p >> 12) ^ (p >> 20) ^ (p >> 27)) & 0xFFFFFFFFU);
+  }
+
+  // \internal
+  static MATHPRESSO_INLINE uint32_t hashChar(uint32_t hash, uint32_t c) {
+    return hash * 65599 + c;
+  }
+
+  // \internal
+  //
+  // Get a hash of the given string `kStr` of `kLen` length. This function doesn't
+  // require `kStr` to be NULL terminated.
+  MATHPRESSO_NOAPI uint32_t hashString(const char* kStr, size_t kLen);
+
+  // \internal
+  //
+  // Get a prime number that is close to `x`, but always greater than or equal to `x`.
+  MATHPRESSO_NOAPI uint32_t closestPrime(uint32_t x);
+};
+
+// ============================================================================
+// [mathpresso::HashNode]
+// ============================================================================
+
+struct HashNode {
+  MATHPRESSO_INLINE HashNode(uint32_t hVal = 0) : _next(NULL), _hVal(hVal) {}
+
+  //! Next node in the chain, NULL if last node.
+  HashNode* _next;
+  //! Hash code.
+  uint32_t _hVal;
+};
+
+// ============================================================================
+// [mathpresso::HashBase]
+// ============================================================================
+
+struct HashBase {
+  MATHPRESSO_NO_COPY(HashBase)
+
+  enum {
+    kExtraFirst = 0,
+    kExtraCount = 1
+  };
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  MATHPRESSO_INLINE HashBase(Allocator* allocator) {
+    _allocator = allocator;
+    _length = 0;
+
+    _bucketsCount = 1;
+    _bucketsGrow = 1;
+
+    _data = _embedded;
+    for (uint32_t i = 0; i <= kExtraCount; i++)
+      _embedded[i] = NULL;
+  }
+
+  MATHPRESSO_INLINE ~HashBase() {
+    if (_data != _embedded)
+      _allocator->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
+  }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  MATHPRESSO_INLINE Allocator* getAllocator() const { return _allocator; }
+
+  // --------------------------------------------------------------------------
+  // [Ops]
+  // --------------------------------------------------------------------------
+
+  MATHPRESSO_NOAPI void _rehash(uint32_t newCount);
+  MATHPRESSO_NOAPI void _mergeToInvisibleSlot(HashBase& other);
+
+  MATHPRESSO_NOAPI HashNode* _put(HashNode* node);
+  MATHPRESSO_NOAPI HashNode* _del(HashNode* node);
+
+  // --------------------------------------------------------------------------
+  // [Reset / Rehash]
+  // --------------------------------------------------------------------------
+
+  Allocator* _allocator;
+
+  uint32_t _length;
+  uint32_t _bucketsCount;
+  uint32_t _bucketsGrow;
+
+  HashNode** _data;
+  HashNode* _embedded[1 + kExtraCount];
+};
+
+// ============================================================================
+// [mathpresso::Hash<Key, Node>]
+// ============================================================================
+
+//! \internal
+//!
+//! Low level hash table container used by MathPresso, with some "special"
+//! features.
+//!
+//! Notes:
+//!
+//! 1. This hash table allows duplicates to be inserted (the API is so low
+//!    level that it's up to you if you allow it or not, as you should first
+//!    `get()` the node and then modify it or insert a new node by using `put()`,
+//!    depending on the intention).
+//!
+//! 2. This hash table also contains "invisible" nodes that are not used by
+//!    the basic hash functions, but can be used by functions having "invisible"
+//!    in their name. These are used by the parser to merge symbols from the
+//!    current scope that is being closed into the root local scope.
+//!
+//! Hash is currently used by AST to keep references of global and local
+//! symbols and by AST to IR translator to associate IR specific data with AST.
+template<typename Key, typename Node>
+struct Hash : public HashBase {
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  MATHPRESSO_INLINE Hash(Allocator* allocator)
+    : HashBase(allocator) {}
+
+  // --------------------------------------------------------------------------
+  // [Ops]
+  // --------------------------------------------------------------------------
+
+  template<typename ReleaseHandler>
+  void reset(ReleaseHandler& handler) {
+    HashNode** data = _data;
+    uint32_t count = _bucketsCount + kExtraCount;
+
+    for (uint32_t i = 0; i < count; i++) {
+      HashNode* node = data[i];
+
+      while (node != NULL) {
+        HashNode* next = node->_next;
+        handler.release(static_cast<Node*>(node));
+        node = next;
+      }
+    }
+
+    if (data != _embedded)
+      _allocator->release(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
+
+    _bucketsCount = 1;
+    _bucketsGrow = 1;
+
+    _length = 0;
+    _data = _embedded;
+
+    for (uint32_t i = 0; i <= kExtraCount; i++)
+      _embedded[i] = NULL;
+  }
+
+  MATHPRESSO_INLINE void mergeToInvisibleSlot(Hash<Key, Node>& other) {
+    _mergeToInvisibleSlot(other);
+  }
+
+  MATHPRESSO_INLINE Node* get(const Key& key, uint32_t hVal) const {
+    uint32_t hMod = hVal % _bucketsCount;
+    Node* node = static_cast<Node*>(_data[hMod]);
+
+    while (node != NULL) {
+      if (node->eq(key))
+        return node;
+      node = static_cast<Node*>(node->_next);
+    }
+
+    return NULL;
+  }
+
+  MATHPRESSO_INLINE Node* put(Node* node) { return static_cast<Node*>(_put(node)); }
+  MATHPRESSO_INLINE Node* del(Node* node) { return static_cast<Node*>(_del(node)); }
+};
+
+// ============================================================================
+// [mathpresso::Map<Key, Value>]
+// ============================================================================
+
+//! \internal
+template<typename Key, typename Value>
+struct Map {
+  MATHPRESSO_NO_COPY(Map)
+
+  struct Node : public HashNode {
+    MATHPRESSO_INLINE Node(const Key& key, const Value& value, uint32_t hVal)
+      : HashNode(hVal),
+        _key(key),
+        _value(value) {}
+    MATHPRESSO_INLINE bool eq(const Key& key) { return _key == key; }
+
+    Key _key;
+    Value _value;
+  };
+
+  struct ReleaseHandler {
+    MATHPRESSO_INLINE ReleaseHandler(Allocator* allocator) : _allocator(allocator) {}
+    MATHPRESSO_INLINE void release(Node* node) { _allocator->release(node, sizeof(Node)); }
+
+    Allocator* _allocator;
+  };
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  MATHPRESSO_INLINE Map(Allocator* allocator)
+    : _hash(allocator) {}
+
+  MATHPRESSO_INLINE ~Map() {
+    ReleaseHandler releaseHandler(_hash.getAllocator());
+    _hash.reset(releaseHandler);
+  }
+
+  // --------------------------------------------------------------------------
+  // [Ops]
+  // --------------------------------------------------------------------------
+
+  MATHPRESSO_INLINE Value get(const Key& key) const {
+    uint32_t hVal = HashUtils::hashPointer(key);
+    uint32_t hMod = hVal % _hash._bucketsCount;
+    Node* node = static_cast<Node*>(_hash._data[hMod]);
+
+    while (node != NULL) {
+      if (node->eq(key))
+        return node->_value;
+      node = static_cast<Node*>(node->_next);
+    }
+
+    return NULL;
+  }
+
+  MATHPRESSO_INLINE Error put(const Key& key, const Value& value) {
+    Node* node = static_cast<Node*>(_hash._allocator->alloc(sizeof(Node)));
+    if (node == NULL)
+      return MATHPRESSO_TRACE_ERROR(kErrorNoMemory);
+
+    uint32_t hVal = HashUtils::hashPointer(key);
+    _hash.put(new(node) Node(key, value, hVal));
+
+    return kErrorOk;
+  }
+
+  Hash<Key, Node> _hash;
+};
+
+} // mathpresso namespace
+
+// [Guard]
+#endif // _MATHPRESSO_MPHASH_P_H

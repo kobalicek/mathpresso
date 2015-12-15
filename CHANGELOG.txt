@@ -1,3 +1,6 @@
+2015-12-15
+- Refactored 90% of the code base to use MPSL's AST, parser, and optimizer.
+
 2015-12-07
 - Refactored and updated to work with latest AsmJit
 

@@ -159,20 +159,23 @@ set(MATHPRESSO_SRC "")
 mathpresso_add_source(MATHPRESSO_SRC mathpresso
   mathpresso.cpp
   mathpresso.h
-  mathpresso_ast.cpp
-  mathpresso_ast_p.h
-  mathpresso_context.cpp
-  mathpresso_context_p.h
-  mathpresso_jit.cpp
-  mathpresso_jit_p.h
-  mathpresso_optimizer.cpp
-  mathpresso_optimizer_p.h
-  mathpresso_parser.cpp
-  mathpresso_parser_p.h
-  mathpresso_tokenizer.cpp
-  mathpresso_tokenizer_p.h
-  mathpresso_util.cpp
-  mathpresso_util_p.h
+  mathpresso_p.h
+  mpallocator.cpp
+  mpallocator_p.h
+  mpast.cpp
+  mpast_p.h
+  mpatomic_p.h
+  mpcompiler.cpp
+  mpcompiler_p.h
+  mpeval_p.h
+  mphash.cpp
+  mphash_p.h
+  mpoptimizer.cpp
+  mpoptimizer_p.h
+  mpparser.cpp
+  mpparser_p.h
+  mptokenizer.cpp
+  mptokenizer_p.h
 )
 
 # =============================================================================
@@ -211,4 +214,7 @@ if(MATHPRESSO_BUILD_TEST)
 
   add_executable(mptest src/test/mptest.cpp)
   target_link_libraries(mptest ${MATHPRESSO_LIBS})
+
+  add_executable(mptutorial src/test/mptutorial.cpp)
+  target_link_libraries(mptutorial ${MATHPRESSO_LIBS})
 endif()

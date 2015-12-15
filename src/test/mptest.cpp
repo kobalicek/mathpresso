@@ -10,14 +10,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-struct TestExpression {
-  const char* expression;
-  double expected;
-};
-
-#define TABLE_SIZE(table) \
-  (sizeof(table) / sizeof(table[0]))
-
 #define TEST_EXPRESSION(expression) \
   { #expression, (double)(expression) }
 
@@ -35,7 +27,74 @@ inline void set_x87_mode(unsigned short mode) {
 }
 #endif
 
-// The reason for TextApp is that we want to replace all functions the
+// ============================================================================
+// [Double]
+// ============================================================================
+
+// Wrapper for `double` so we can test % operator in our tests properly.
+struct Double {
+  inline Double(double val = 0) : val(val) {}
+  inline operator double() const { return val; }
+
+  double val;
+};
+
+inline Double operator-(const Double &self) { return Double(-self.val); }
+inline Double operator!(const Double &self) { return Double(!self.val); }
+
+inline Double operator+(const Double& x, double y) { return Double(x.val + y); }
+inline Double operator-(const Double& x, double y) { return Double(x.val - y); }
+inline Double operator*(const Double& x, double y) { return Double(x.val * y); }
+inline Double operator/(const Double& x, double y) { return Double(x.val / y); }
+inline Double operator%(const Double& x, double y) { return Double(fmod(x.val, y)); }
+
+inline Double operator+(double x, const Double& y) { return Double(x + y.val); }
+inline Double operator-(double x, const Double& y) { return Double(x - y.val); }
+inline Double operator*(double x, const Double& y) { return Double(x * y.val); }
+inline Double operator/(double x, const Double& y) { return Double(x / y.val); }
+inline Double operator%(double x, const Double& y) { return Double(fmod(x, y.val)); }
+
+inline Double operator+(const Double& x, const Double& y) { return Double(x.val + y.val); }
+inline Double operator-(const Double& x, const Double& y) { return Double(x.val - y.val); }
+inline Double operator*(const Double& x, const Double& y) { return Double(x.val * y.val); }
+inline Double operator/(const Double& x, const Double& y) { return Double(x.val / y.val); }
+inline Double operator%(const Double& x, const Double& y) { return Double(fmod(x.val, y.val)); }
+
+// ============================================================================
+// [TestExpression]
+// ============================================================================
+
+struct TestExpression {
+  const char* expression;
+  double expected;
+};
+
+// ============================================================================
+// [TestOption]
+// ============================================================================
+
+struct TestOption {
+  const char* name;
+  unsigned int options;
+};
+
+// ============================================================================
+// [TestLog]
+// ============================================================================
+
+struct TestOutputLog : public mathpresso::OutputLog {
+  TestOutputLog() {}
+  virtual ~TestOutputLog() {}
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
+    printf("[Failure]: %s (at %u)\n", message, column);
+  }
+};
+
+// ============================================================================
+// [TestApp]
+// ============================================================================
+
+// The reason for TestApp is that we want to replace all functions the
 // expression can use.
 struct TestApp {
   TestApp(int argc, char* argv[])
@@ -43,9 +102,10 @@ struct TestApp {
       argv(argv),
       E(2.7182818284590452354),
       PI(3.14159265358979323846),
-      x(5.1),
-      y(6.7),
-      z(9.9) {
+      x(1.5),
+      y(2.5),
+      z(9.9),
+      big(4503599627370496.0) {
   }
 
   int run() {
@@ -59,54 +119,121 @@ struct TestApp {
 #endif
 
     mathpresso::Context ctx;
-    mathpresso::Expression e0;
-    mathpresso::Expression e1;
+    mathpresso::Expression e;
+    TestOutputLog outputLog;
 
-    ctx.addEnvironment(mathpresso::kMPEnvironmentAll);
-    ctx.addVariable("x", 0 * sizeof(double));
-    ctx.addVariable("y", 1 * sizeof(double));
-    ctx.addVariable("z", 2 * sizeof(double));
+    ctx.addBuiltIns();
+    ctx.addVariable("x"  , 0 * sizeof(double));
+    ctx.addVariable("y"  , 1 * sizeof(double));
+    ctx.addVariable("z"  , 2 * sizeof(double));
+    ctx.addVariable("big", 3 * sizeof(double));
 
-    double variables[] = { x, y, z };
+    double variables[] = { x, y, z, big };
 
     TestExpression tests[] = {
-      TEST_EXPRESSION( x+y ),
-      TEST_EXPRESSION( x-y ),
-      TEST_EXPRESSION( x*y ),
-      TEST_EXPRESSION( x/y ),
-      TEST_EXPRESSION( -(x+y) ),
-      TEST_EXPRESSION( -(x-y) ),
-      TEST_EXPRESSION( x*z + y*z),
-      TEST_EXPRESSION( x*z - y*z),
-      TEST_EXPRESSION( x*z*y*z),
-      TEST_EXPRESSION( x*z/y*z),
+      TEST_EXPRESSION( x + y ),
+      TEST_EXPRESSION( x - y ),
+      TEST_EXPRESSION( x * y ),
+      TEST_EXPRESSION( x / y ),
+
+      TEST_EXPRESSION( x * -y ),
+      TEST_EXPRESSION( x / -y ),
+
+      TEST_EXPRESSION( -x * y ),
+      TEST_EXPRESSION( -x / y ),
+
+      TEST_EXPRESSION( -x * -y ),
+      TEST_EXPRESSION( -x / -y ),
+
+      TEST_EXPRESSION( x % y ),
+      TEST_EXPRESSION( z % y ),
+      TEST_EXPRESSION( x % -y ),
+      TEST_EXPRESSION( z % -y ),
+      TEST_EXPRESSION( -x % y ),
+      TEST_EXPRESSION( -z % y ),
+      TEST_EXPRESSION( -x % -y ),
+      TEST_EXPRESSION( -z % -y ),
+
+      TEST_EXPRESSION( -(x + y) ),
+      TEST_EXPRESSION( -(x - y) ),
+      TEST_EXPRESSION( -(x * y) ),
+      TEST_EXPRESSION( -(x / y) ),
+      TEST_EXPRESSION( -(x % y) ),
+
+      TEST_EXPRESSION( x * z + y * z),
+      TEST_EXPRESSION( x * z - y * z),
+      TEST_EXPRESSION( x * z * y * z),
+      TEST_EXPRESSION( x * z / y * z),
+
       TEST_EXPRESSION( x == y ),
       TEST_EXPRESSION( x != y ),
-      TEST_EXPRESSION( x <  y ),
+      TEST_EXPRESSION( x < y ),
       TEST_EXPRESSION( x <= y ),
-      TEST_EXPRESSION( x >  y ),
+      TEST_EXPRESSION( x > y ),
       TEST_EXPRESSION( x >= y ),
+
       TEST_EXPRESSION( x + y == y - z ),
       TEST_EXPRESSION( x > y == y < z ),
+
       TEST_EXPRESSION( -x ),
-      TEST_EXPRESSION( -1 + x ),
-      TEST_EXPRESSION( -(-(-1)) ),
+      TEST_EXPRESSION( -1.0 + x ),
+      TEST_EXPRESSION( -(-(-1.0)) ),
       TEST_EXPRESSION( -(-(-x)) ),
-      TEST_EXPRESSION( (x+y)*x ),
-      TEST_EXPRESSION( (x+y)*y ),
+
       TEST_EXPRESSION( (x+y)*(1.19+z) ),
       TEST_EXPRESSION( ((x+(x+2.13))*y) ),
-      TEST_EXPRESSION( (x+y+z*2+(x*z+z*1.5)) ),
+      TEST_EXPRESSION( (x+y+z*2.0+(x*z+z*1.5)) ),
       TEST_EXPRESSION( (((((((x-0.28)+y)+x)+x)*x)/1.12)*y) ),
       TEST_EXPRESSION( ((((x*((((y-1.50)+1.82)-x)/PI))/x)*x)+z) ),
       TEST_EXPRESSION( (((((((((x+1.35)+PI)/PI)-y)+z)-z)+y)/x)+0.81) ),
+
       TEST_EXPRESSION( round(x) ),
+      TEST_EXPRESSION( round(y) ),
+      TEST_EXPRESSION( round(big) ),
       TEST_EXPRESSION( round(-x) ),
+      TEST_EXPRESSION( round(-y) ),
+      TEST_EXPRESSION( round(-big) ),
+
+      TEST_EXPRESSION( roundeven(x) ),
+      TEST_EXPRESSION( roundeven(y) ),
+      TEST_EXPRESSION( roundeven(big) ),
+      TEST_EXPRESSION( roundeven(-x) ),
+      TEST_EXPRESSION( roundeven(-y) ),
+      TEST_EXPRESSION( roundeven(-big) ),
+
+      TEST_EXPRESSION( trunc(x) ),
+      TEST_EXPRESSION( trunc(y) ),
+      TEST_EXPRESSION( trunc(big) ),
+      TEST_EXPRESSION( trunc(-x) ),
+      TEST_EXPRESSION( trunc(-y) ),
+      TEST_EXPRESSION( trunc(-big) ),
+
       TEST_EXPRESSION( floor(x) ),
+      TEST_EXPRESSION( floor(y) ),
+      TEST_EXPRESSION( floor(big) ),
       TEST_EXPRESSION( floor(-x) ),
+      TEST_EXPRESSION( floor(-y) ),
+      TEST_EXPRESSION( floor(-big) ),
+
       TEST_EXPRESSION( ceil(x) ),
+      TEST_EXPRESSION( ceil(y) ),
+      TEST_EXPRESSION( ceil(big) ),
       TEST_EXPRESSION( ceil(-x) ),
+      TEST_EXPRESSION( ceil(-y) ),
+      TEST_EXPRESSION( ceil(-big) ),
+
       TEST_EXPRESSION( abs(-x) ),
+      TEST_EXPRESSION( abs(-big) ),
+
+      TEST_EXPRESSION( frac(x) ),
+      TEST_EXPRESSION( frac(-x) ),
+      TEST_EXPRESSION( frac(y) ),
+      TEST_EXPRESSION( frac(-y) ),
+      TEST_EXPRESSION( frac(z) ),
+      TEST_EXPRESSION( frac(-z) ),
+      TEST_EXPRESSION( frac(big) ),
+      TEST_EXPRESSION( frac(-big) ),
+
       TEST_EXPRESSION( sqrt(x) ),
       TEST_EXPRESSION( recip(x) ),
       TEST_EXPRESSION( exp(x) ),
@@ -122,45 +249,44 @@ struct TestApp {
       TEST_EXPRESSION( pow(x, y) )
     };
 
-    for (int i = 0; i < TABLE_SIZE(tests); i++) {
+    TestOption options[] = {
+      "SSE2", mathpresso::kOptionDisableSSE4_1,
+      "BEST", mathpresso::kNoOptions
+    };
+
+    printf("MPTest environment:\n");
+    printf("  x = %f\n", (double)x);
+    printf("  y = %f\n", (double)y);
+    printf("  z = %f\n", (double)z);
+    printf("  big = %f\n", (double)big);
+
+    for (int i = 0; i < MATHPRESSO_ARRAY_SIZE(tests); i++) {
       const char* exp = tests[i].expression;
-      bool expOk = true;
-
-      int err;
-      if ((err = e0.create(ctx, exp, mathpresso::kMPOptionDisableJIT))) {
-        printf("[Failure]: \"%s\" (eval)\n", exp);
-        printf("           ERROR %d (jit disabled).\n", err);
-        continue;
-      }
-
-      if ((err = e1.create(ctx, exp, mathpresso::kMPOptionNone))) {
-        printf("[Failure]: \"%s\" (jit)\n", exp);
-        printf("           ERROR %d (jit enabled).\n", err);
-        continue;
-      }
-
       double expected = tests[i].expected;
-      double res0 = e0.evaluate(variables);
-      double res1 = e1.evaluate(variables);
+      bool allOk = true;
 
-      if (res0 != expected) {
-        printf("[Failure]: \"%s\" (eval)\n", exp);
-        printf("           result(%f) != expected(%f)\n", res0, expected);
-        expOk = false;
+      for (int j = 0; j < MATHPRESSO_ARRAY_SIZE(options); j++) {
+        const TestOption& option = options[j];
+        int err = e.compile(ctx, exp, option.options, &outputLog);
+
+        if (err) {
+          printf("[ERROR %u]: \"%s\" (%s)\n", err, exp, option.name);
+          allOk = false;
+          continue;
+        }
+
+        double result = e.evaluate(variables);
+        if (result != expected) {
+          printf("[Failure]: \"%s\" (%s)\n", exp, option.name);
+          printf("           result(%f) != expected(%f)\n", result, expected);
+          allOk = false;
+        }
       }
 
-      if (res1 != expected) {
-        printf("[Failure]: \"%s\" (jit)\n", exp);
-        printf("           result(%f) != expected(%f)\n", res1, expected);
-        expOk = false;
-      }
-
-      if (expOk) {
+      if (allOk)
         printf("[Success]: \"%s\" -> %f\n", exp, expected);
-      }
-      else {
+      else
         failed = true;
-      }
     }
 
     return failed ? 1 : 0;
@@ -177,31 +303,52 @@ struct TestApp {
   // [Constants]
   // --------------------------------------------------------------------------
 
-  volatile double E;
-  volatile double PI;
+  Double E;
+  Double PI;
 
   // --------------------------------------------------------------------------
   // [Variables]
   // --------------------------------------------------------------------------
 
-  // Made volatile so the compiler doesn't optimize evaluation of the
-  // expression into 80-bit FPU registers. Otherwise we will have some
-  // failures.
-  volatile double x;
-  volatile double y;
-  volatile double z;
+  Double x;
+  Double y;
+  Double z;
+  Double big;
 
   // --------------------------------------------------------------------------
   // [Functions]
   // --------------------------------------------------------------------------
 
-  inline double abs(double x) { return x < 0.0 ? -x : x; }
-  inline double recip(double x) { return 1.0 / x; }
+  inline Double abs(double x) {
+    return Double(x < 0.0 ? -x : x);
+  }
 
-  inline double avg(double x, double y) { return (x + y) * 0.5; }
-  inline double min(double x, double y) { return x < y ? x : y; }
-  inline double max(double x, double y) { return x > y ? x : y; }
+  inline Double recip(double x) {
+    return Double(1.0 / x);
+  }
+
+  inline Double frac(double x) {
+    double y = ::floor(x);
+    return Double(x - y);
+  }
+
+  inline Double round(double x) {
+    double y = ::floor(x);
+    return Double(y + (x - y >= 0.5 ? double(1.0) : double(0.0)));
+  }
+
+  inline Double roundeven(double x) {
+    return Double(::rint(x));
+  }
+
+  inline Double avg(double x, double y) { return Double((x + y) * 0.5); }
+  inline Double min(double x, double y) { return Double(x < y ? x : y); }
+  inline Double max(double x, double y) { return Double(x > y ? x : y); }
 };
+
+// ============================================================================
+// [Main]
+// ============================================================================
 
 int main(int argc, char* argv[]) {
   return TestApp(argc, argv).run();

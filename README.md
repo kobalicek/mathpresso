@@ -5,16 +5,14 @@ Official Repository: https://github.com/kobalicek/mathpresso-ng
 
 MathPresso is a C++ library designed to parse mathematical expressions and compile them into machine code. It's much faster than traditional AST or byte-code based evaluators, because there is basically no overhead in the expression's execution. The JIT compiler is based on AsmJit and works on X86 and X64 architectures.
 
-This is an updated version of MathPresso that works with a new AsmJit library and uses double-precision floating points. It has many bugs fixed compared to the last version on google-code and contains improvements that can make execution of certain built-in functions faster if the host CPU supports SSE4.1 (rounding, modulo).
-
-This version of MathPresso is currently not completely up-to-date with its forks called DoublePresso. Pull request that add functionality contained there and bugs fixes are welcome.
+This is an updated version of MathPresso that uses a stripped-off MPSL engine designed to work with scalar double precision floating points. It has many bugs fixed compared to the last version on google-code and contains improvements that can make execution of certain built-in functions (intrinsics) faster if the host CPU supports SSE4.1 (rounding, fraction, modulo, etc...).
 
 This is also a transitional version that is available to users that want to use MathPresso and cannot wait for the new MPSL engine, which is a work in progress.
 
 Usage
 =====
 
-MathPresso's expression is always created around a `mathpresso::Context`, which defines an environment the expression can access and use. For example if you plan to extend MathPresso with your own function or constant the `Context` is the way to go. The `Context` also defines inputs and outputs of the expression that is shown in the example below:
+MathPresso's expression is always created around a `mathpresso::Context`, which defines an environment the expression can access and use. For example if you plan to extend MathPresso with your own function or constant the `Context` is the way to go. The `Context` also defines inputs and outputs of the expression as is shown in the example below:
 
 ```c++
 #include "mathpresso/mathpresso.h"
@@ -23,24 +21,30 @@ int main(int argc, char* argv() {
   mathpresso::Context ctx;
   mathpresso::Expression exp;
 
-  // Initialize the context by adding a basic environment MathPresso offers.
-  // It adds E and PI constants and all built-in functions.
-  ctx.addEnvironment(mathpresso::kMPEnvironmentAll);
+  // Initialize the context by adding MathPresso built-ins. Without this line
+  // functions like round(), sin(), etc won't be available.
+  ctx.addBuiltIns();
 
   // Let the context know the name of the variables we will refer to and
   // their positions in the data pointer. We will use an array of 3 doubles,
   // so index them by using `sizeof(double)`, like a normal C array.
+  //
+  // The `addVariable()` also contains a third parameter that describes
+  // variable flags, use `kVariableRO` to make certain variable read-only.
   ctx.addVariable("x", 0 * sizeof(double));
   ctx.addVariable("y", 1 * sizeof(double));
   ctx.addVariable("z", 2 * sizeof(double));
 
-  // Compile some expression. The create parameters are:
-  //   1. `mathpresso::Context&` - The expression's environment.
-  //   2. `const char* exp` - The expression string.
-  //   3. `uint` - Options, just pass `mathpresso::kMPOptionNone`.
-  mathpresso::MPResult err = exp.create(ctx, "(x*y) % z", mathpresso::kMPOptionNone);
-  if (err != mathpresso::kMPResultOk) {
-    // Handle possible syntax or compilation error.
+  // Compile an expression.
+  //
+  // The create parameters are:
+  //   1. `mathpresso::Context&` - The expression's context / environment.
+  //   2. `const char* body` - The expression body.
+  //   3. `unsigned int` - Options, just pass `mathpresso::kNoOptions`.
+  mathpresso::Error err = exp.compile(ctx, "(x*y) % z", mathpresso::kNoOptions);
+
+  // Handle possible syntax or compilation error.
+  if (err != mathpresso::kErrorOk) {
     printf("Expression Error: %u\n", err);
     return 1;
   }
@@ -75,13 +79,13 @@ int main(int argc, char* argv() {
   mathpresso::Context ctx;
   mathpresso::Expression exp;
 
-  ctx.addEnvironment(mathpresso::kMPEnvironmentAll);
+  ctx.addBuiltIns();
   ctx.addVariable("x", MATHPRESSO_OFFSET(Data, x));
   ctx.addVariable("y", MATHPRESSO_OFFSET(Data, y));
   ctx.addVariable("z", MATHPRESSO_OFFSET(Data, z));
 
-  mathpresso::MPResult err = exp.create(ctx, "(x*y) % z", mathpresso::kMPOptionNone);
-  if (err != mathpresso::kMPResultOk) {
+  mathpresso::Error err = exp.compile(ctx, "(x*y) % z", mathpresso::kNoOptions);
+  if (err != mathpresso::kErrorOk) {
     printf("Expression Error: %u\n", err);
     return 1;
   }
@@ -103,7 +107,7 @@ The following arithmetic operators are supported:
   - Subtracion `x - y`
   - Multiplication `x * y`
   - Division `x / y`
-  - Remainder `x % y`
+  - Modulo `x % y`
 
 The following comparision operators are supported:
 
@@ -117,18 +121,36 @@ The following comparision operators are supported:
 The following unary operators are supported:
   
   - Negate `-(x)`
+  - Not `!(x)`
 
-The following functions are supported throught `addEnvironment()`:
+The following functions are defined by `addBuiltIns()`:
 
-  - Round `round(x)`
+  - Check for NaN `isnan(x)`
+  - Check for Infinity `isinf(x)`
+  - Check for finite number `isfinite(x)`
+  - Get a sign bit `signbit(x)`
+  - Copy sign `copysign(x, y)`
+
+  - Round to nearest `round(x)`
+  - Round to even `roundeven(x)`
+  - Truncate `trunc(x)`
   - Floor `floor(x)`
   - Ceil `ceil(x)`
+
+  - Average value `avg(x, y)`
+  - Minimum value `min(x, y)`
+  - Maximum value `max(x, y)`
+
   - Absolute value `abs(x)`
-  - Square root `sqrt(x)`
-  - Reciprocal `recip(x)`
   - Exponential `exp(x)`
   - Logarithm `log(x)`
+  - Logarithm of base 2 `log2(x)`
   - Logarithm of base 10 `log10(x)`
+  - Square root `sqrt(x)`
+  - Fraction `frac(x)`
+  - Reciprocal `recip(x)`
+  - Power `pow(x, y)`
+
   - Sine `sin(x)`
   - Cosine `cos(x)`
   - Tangent `tan(x)`
@@ -139,15 +161,167 @@ The following functions are supported throught `addEnvironment()`:
   - Arc cosine `acos(x)`
   - Arc tangent `atan(x)`
   - Arc tangent `atan2(x, y)`
-  - Average value `avg(x, y)`
-  - Minimum value `min(x, y)`
-  - Maximum value `max(x, y)`
-  - Power `pow(x, y)`
 
-The following constants are supported throught `addEnvironment()`:
+The following constants are defined by `addBuiltIns()`:
 
+  - INF (infinity)
+  - NaN (not a number)
   - E `2.7182818284590452354`
   - PI `3.14159265358979323846`
+
+Error Handling
+==============
+
+MathPresso allows to attach an `OutputLog` instance to retrieve a human readable error message in case of error. It can output the following:
+
+  - Errors, only one as MathPresso stops after the first error
+  - Warnings
+  - Abstract syntax tree (AST)
+  - Assembly (ASM)
+
+Here is the minimum working example that uses `OutputLog` to display errors. The interface is very simple, but extensible.
+
+```c++
+// This is a minimum working example that uses most of MathPresso features. It
+// shows how to compile and evaluate expressions and how to handle errors. It
+// also shows how to print the generated AST and machine code.
+#include "../mathpresso/mathpresso.h"
+
+#include <stdio.h>
+
+// The data passed to the expression.
+struct Data {
+  double x, y, z;
+};
+
+// By inheriting `OutputLog` one can create a way how to handle possible errors
+// and report them to humans. The most interesting and used message type is
+// `kMessageError`, because it signalizes an invalid expression. Other message
+// types are used mostly for debugging.
+struct MyOutputLog : public mathpresso::OutputLog {
+  MyOutputLog() {}
+  virtual ~MyOutputLog() {}
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
+    switch (type) {
+      case kMessageError:
+        printf("[ERROR]: %s (line %u, column %u)\n", message, line, column);
+        break;
+
+      case kMessageWarning:
+        printf("[WARNING]: %s (line %u, column %u)\n", message, line, column);
+        break;
+
+      case kMessageAstInitial:
+        printf("[AST-INITIAL]\n%s", message);
+        break;
+
+      case kMessageAstFinal:
+        printf("[AST-FINAL]\n%s", message);
+        break;
+
+      case kMessageAsm:
+        printf("[ASSEMBLY]\n%s", message);
+        break;
+
+      default:
+        printf("[UNKNOWN]\n%s", message);
+        break;
+    }
+  }
+};
+
+int main(int argc, char* argv[]) {
+  MyOutputLog outputLog;
+
+  // Create the context, add builtins and define the `Data` layout.
+  mathpresso::Context ctx;
+  ctx.addBuiltIns();
+  ctx.addVariable("x"  , MATHPRESSO_OFFSET(Data, x));
+  ctx.addVariable("y"  , MATHPRESSO_OFFSET(Data, y));
+  ctx.addVariable("z"  , MATHPRESSO_OFFSET(Data, z));
+
+  // The following options will cause that MathPresso will send everything
+  // it does to `OutputLog`.
+  unsigned int options = 
+    mathpresso::kOptionVerbose  | // Enable warnings, not just errors.
+    mathpresso::kOptionDebugAst | // Enable AST dumps.
+    mathpresso::kOptionDebugAsm ; // Enable ASM dumps.
+
+  mathpresso::Expression exp;
+  mathpresso::Error err = exp.compile(ctx,
+    "-(-(abs(x * y - floor(x)))) * z * (12.9 - 3)", options, &outputLog);
+
+  if (err) {
+    // Handle possible error. The OutputLog has already received the reason
+    // in a human readable form.
+    printf("ERROR %u\n", err);
+    return 1;
+  }
+
+  // Evaluate the expression, if compiled.
+  Data data = { 12.2, 9.2, -1.9 };
+  double result = exp.evaluate(&data);
+
+  printf("RESULT: %f\n", result);
+  return 0;
+}
+```
+
+When executed the output of the application would be something like:
+
+```
+[AST-INITIAL]
+* [Binary]
+  * [Binary]
+    - [Unary]
+      - [Unary]
+        abs [Unary]
+          - [Binary]
+            * [Binary]
+              x
+              y
+            floor [Unary]
+              x
+    z
+  - [Binary]
+    12.900000
+    3.000000
+
+[AST-FINAL]
+* [Binary]
+  * [Binary]
+    abs [Unary]
+      - [Binary]
+        * [Binary]
+          x
+          y
+        floor [Unary]
+          x
+    z
+  9.900000
+
+[ASSEMBLY]
+L0:                                 ;                     |                           ..
+lea rax, [L2]                       ; 488D05........      | lea pConst, [L2]          ..w
+movsd xmm0, [rdx]                   ; F20F1002            | movsd v3, [pVariables]    .r.w
+mulsd xmm0, [rdx+8]                 ; F20F594208          | mulsd v3, [pVariables+8]  .r.x
+movsd xmm1, [rdx]                   ; F20F100A            | movsd v4, [pVariables]    .r..w
+roundsd xmm1, xmm1, 9               ; 660F3A0BC909        | roundsd v4, v4, 9         ....x
+subsd xmm0, xmm1                    ; F20F5CC1            | subsd v3, v4              ...xR
+xorpd xmm1, xmm1                    ; 660F57C9            | xorpd v5, v5              .... w
+subsd xmm1, xmm0                    ; F20F5CC8            | subsd v5, v3              ...r x
+maxsd xmm1, xmm0                    ; F20F5FC8            | maxsd v5, v3              ...R x
+mulsd xmm1, [rdx+16]                ; F20F594A10          | mulsd v5, [pVariables+16] .R.  x
+mulsd xmm1, [rax]                   ; F20F5908            | mulsd v5, [pConst]        . R  x
+movsd [rcx], xmm1                   ; F20F1109            | movsd [pResult], v5       R    R
+L1:                                 ;                     |
+ret                                 ; C3                  |
+.align 8
+L2:                                 ;                     |
+.data CDCCCCCCCCCC2340
+
+RESULT: -1885.514400
+```
 
 Dependencies
 ============
@@ -158,4 +332,3 @@ Contact
 =======
 
 Petr Kobalicek <kobalicek.petr@gmail.com>
-(TODO: add here contact to people that maintain DoublePresso)
