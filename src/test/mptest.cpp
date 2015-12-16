@@ -37,6 +37,9 @@ struct Double {
   inline Double(double val = 0) : val(val) {}
   inline operator double() const { return val; }
 
+  inline Double& operator=(double x) { val = x; return *this; }
+  inline Double& operator=(const Double& x) { val = x.val; return *this; }
+
   double val;
 };
 
@@ -104,6 +107,35 @@ struct TestOutputLog : public mathpresso::OutputLog {
 // The reason for TestApp is that we want to replace all functions the
 // expression can use.
 struct TestApp {
+  // --------------------------------------------------------------------------
+  // [Compatibility with the MathPresso Language]
+  // --------------------------------------------------------------------------
+
+  typedef Double var;
+
+  // Constants / Variables.
+  Double E, PI;
+  Double x, y, z, big;
+
+  // Functions.
+  inline Double avg(double x, double y) { return Double((x + y) * 0.5); }
+  inline Double min(double x, double y) { return Double(x < y ? x : y); }
+  inline Double max(double x, double y) { return Double(x > y ? x : y); }
+
+  inline Double abs(double x) { return Double(x < 0.0 ? -x : x); }
+  inline Double recip(double x) { return Double(1.0 / x); }
+
+  inline Double frac(double x) { return Double(x - ::floor(x)); }
+  inline Double round(double x) {
+    double y = ::floor(x);
+    return Double(y + (x - y >= 0.5 ? double(1.0) : double(0.0)));
+  }
+  inline Double roundeven(double x) { return Double(::rint(x)); }
+
+  // --------------------------------------------------------------------------
+  // [TestApp]
+  // --------------------------------------------------------------------------
+
   TestApp(int argc, char* argv[])
     : argc(argc),
       argv(argv),
@@ -329,52 +361,6 @@ struct TestApp {
 
   int argc;
   char** argv;
-
-  // --------------------------------------------------------------------------
-  // [Constants]
-  // --------------------------------------------------------------------------
-
-  Double E;
-  Double PI;
-
-  // --------------------------------------------------------------------------
-  // [Variables]
-  // --------------------------------------------------------------------------
-
-  Double x;
-  Double y;
-  Double z;
-  Double big;
-
-  // --------------------------------------------------------------------------
-  // [Functions]
-  // --------------------------------------------------------------------------
-
-  inline Double abs(double x) {
-    return Double(x < 0.0 ? -x : x);
-  }
-
-  inline Double recip(double x) {
-    return Double(1.0 / x);
-  }
-
-  inline Double frac(double x) {
-    double y = ::floor(x);
-    return Double(x - y);
-  }
-
-  inline Double round(double x) {
-    double y = ::floor(x);
-    return Double(y + (x - y >= 0.5 ? double(1.0) : double(0.0)));
-  }
-
-  inline Double roundeven(double x) {
-    return Double(::rint(x));
-  }
-
-  inline Double avg(double x, double y) { return Double((x + y) * 0.5); }
-  inline Double min(double x, double y) { return Double(x < y ? x : y); }
-  inline Double max(double x, double y) { return Double(x > y ? x : y); }
 };
 
 // ============================================================================

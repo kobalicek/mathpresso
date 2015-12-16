@@ -202,6 +202,8 @@ struct AstBuilder {
     return _allocator->allocString(s, sLen);
   }
 
+  MATHPRESSO_INLINE uint32_t newSlotId() { return _numSlots++; }
+
   // --------------------------------------------------------------------------
   // [Init]
   // --------------------------------------------------------------------------
@@ -227,6 +229,9 @@ struct AstBuilder {
   AstScope* _globalScope;
   //! Root node.
   AstProgram* _programNode;
+
+  //! Number of variable slots used.
+  uint32_t _numSlots;
 };
 
 // ============================================================================
@@ -307,6 +312,9 @@ struct AstSymbol : public HashNode {
     _opType = static_cast<uint8_t>(opType);
   }
 
+  MATHPRESSO_INLINE uint32_t getVarSlot() const { return _varSlot; }
+  MATHPRESSO_INLINE void setVarSlot(uint32_t slot) { _varSlot = slot; }
+
   MATHPRESSO_INLINE int32_t getVarOffset() const { return _varOffset; }
   MATHPRESSO_INLINE void setVarOffset(int32_t offset) { _varOffset = offset; }
 
@@ -363,6 +371,8 @@ struct AstSymbol : public HashNode {
 
   union {
     struct {
+      //! Variable slot (local variables).
+      uint32_t _varSlot;
       //! Variable offset in data structure (in case the symbol is a global variable).
       int32_t _varOffset;
       //! The current value of the symbol (in case the symbol is an immediate).

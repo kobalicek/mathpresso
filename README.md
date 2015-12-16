@@ -69,10 +69,10 @@ Features
     * Arctangent `atan(x)`
     * Arctangent `atan2(x, y)`
   * Constants defined by `addBuiltIns()`:
-    * INF (infinity)
-    * NaN (not a number)
-    * E (Euler's constant) `2.7182818284590452354`
-    * PI `3.14159265358979323846`
+    * Infinity `INF`
+    * Not a Number `NaN`
+    * Euler's constant `E = 2.7182818284590452354`
+    * PI `PI = 3.14159265358979323846`
 
 Usage
 -----

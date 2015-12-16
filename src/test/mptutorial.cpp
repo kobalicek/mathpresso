@@ -21,8 +21,6 @@ struct Data {
 // `kMessageError`, because it signalizes an invalid expression. Other message
 // types are used mostly for debugging.
 struct MyOutputLog : public mathpresso::OutputLog {
-  MyOutputLog() {}
-  virtual ~MyOutputLog() {}
   virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
     switch (type) {
       case kMessageError:

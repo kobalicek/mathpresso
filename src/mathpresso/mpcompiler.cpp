@@ -94,6 +94,12 @@ struct MATHPRESSO_NOAPI JitVar {
   MATHPRESSO_INLINE JitVar(const JitVar& other) : op(other.op), flags(other.flags) {}
   MATHPRESSO_INLINE ~JitVar() {}
 
+  // Reset
+  MATHPRESSO_INLINE void reset() {
+    op.reset();
+    flags = FLAG_NONE;
+  }
+
   // Operator Overload.
   MATHPRESSO_INLINE const JitVar& operator=(const JitVar& other) {
     op = other.op;
@@ -130,7 +136,7 @@ struct MATHPRESSO_NOAPI JitVar {
 // ============================================================================
 
 struct MATHPRESSO_NOAPI JitCompiler {
-  JitCompiler(asmjit::X86Compiler* c);
+  JitCompiler(Allocator* allocator, asmjit::X86Compiler* c);
   ~JitCompiler();
 
   // Function Generator.
@@ -143,9 +149,9 @@ struct MATHPRESSO_NOAPI JitCompiler {
   JitVar registerVar(const JitVar& other);
 
   // Compiler.
-  JitVar onNode(AstNode* node);
+  void compile(AstBlock* node, uint32_t numSlots);
 
-  void onProgram(AstBlock* node);
+  JitVar onNode(AstNode* node);
   JitVar onBlock(AstBlock* node);
   JitVar onVarDecl(AstVarDecl* node);
   JitVar onVar(AstVar* node);
@@ -166,10 +172,13 @@ struct MATHPRESSO_NOAPI JitCompiler {
   JitVar getConstantD64AsPD(double value);
 
   // Members.
+  Allocator* allocator;
   asmjit::X86Compiler* c;
 
   X86GpVar resultAddress;
   X86GpVar variablesAddress;
+
+  JitVar* varSlots;
   asmjit::HLNode* functionBody;
 
   asmjit::Label constLabel;
@@ -179,13 +188,15 @@ struct MATHPRESSO_NOAPI JitCompiler {
   bool enableSSE4_1;
 };
 
-JitCompiler::JitCompiler(asmjit::X86Compiler* c)
-  : c(c),
+JitCompiler::JitCompiler(Allocator* allocator, asmjit::X86Compiler* c)
+  : allocator(allocator),
+    c(c),
+    varSlots(NULL),
+    functionBody(NULL),
     constPool(&c->_constAllocator) {
 
   enableSSE4_1 = asmjit::X86CpuInfo::getHost()->hasFeature(asmjit::kX86CpuFeatureSSE4_1);
 }
-
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::beginFunction() {
@@ -232,6 +243,29 @@ JitVar JitCompiler::registerVar(const JitVar& other) {
     return other;
 }
 
+void JitCompiler::compile(AstBlock* node, uint32_t numSlots) {
+  if (numSlots != 0) {
+    varSlots = static_cast<JitVar*>(allocator->alloc(sizeof(JitVar) * numSlots));
+    if (varSlots == NULL) return;
+
+    for (uint32_t i = 0; i < numSlots; i++)
+      varSlots[i] = JitVar(c->newXmmSd(), JitVar::FLAG_NONE);
+  }
+
+  JitVar result = onBlock(node);
+  X86XmmVar var;
+
+  // Return NaN if no result is given.
+  if (result.isNone())
+    var = registerVar(getConstantD64(mpGetNan())).getXmm();
+  else
+    var = registerVar(result).getXmm();
+  c->movsd(asmjit::x86::ptr(resultAddress), var);
+
+  if (numSlots != 0)
+    allocator->release(varSlots, sizeof(JitVar) * numSlots);
+}
+
 JitVar JitCompiler::onNode(AstNode* node) {
   switch (node->getNodeType()) {
     case kAstNodeBlock    : return onBlock    (static_cast<AstBlock*    >(node));
@@ -248,28 +282,38 @@ JitVar JitCompiler::onNode(AstNode* node) {
   }
 }
 
-void JitCompiler::onProgram(AstBlock* node) {
-  JitVar result = registerVar(onBlock(node));
-  c->movsd(asmjit::x86::ptr(resultAddress), result.getXmm());
-}
-
 JitVar JitCompiler::onBlock(AstBlock* node) {
   JitVar result;
   uint32_t i, len = node->getLength();
 
   for (i = 0; i < len; i++)
     result = onNode(node->getAt(i));
+
+  // Return the last result (or no result if the block is empty).
   return result;
 }
 
 JitVar JitCompiler::onVarDecl(AstVarDecl* node) {
-  // TODO: Not implemented.
-  return JitVar();
+  JitVar result;
+
+  if (node->hasChild())
+    result = onNode(node->getChild());
+
+  AstSymbol* sym = node->getSymbol();
+  varSlots[sym->getVarSlot()] = result;
+
+  return result;
 }
 
 JitVar JitCompiler::onVar(AstVar* node) {
   AstSymbol* sym = node->getSymbol();
-  return JitVar(asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), JitVar::FLAG_RO);
+  if (sym->getVarSlot() == 0xFFFFFFFF)
+    return JitVar(asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), JitVar::FLAG_RO);
+  
+  JitVar result = varSlots[sym->getVarSlot()];
+  if (result.isNone())
+    result = getConstantD64(mpGetNan());
+  return result;
 }
 
 JitVar JitCompiler::onImm(AstImm* node) {
@@ -418,16 +462,17 @@ JitVar JitCompiler::onBinaryOp(AstBinaryOp* node) {
     MATHPRESSO_ASSERT(varNode->getNodeType() == kAstNodeVar);
 
     AstSymbol* sym = varNode->getSymbol();
-    JitVar var = registerVar(onNode(right));
+    JitVar result = registerVar(onNode(right));
 
-    c->emit(asmjit::kX86InstIdMovsd,
-      asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), var.getOperand());
-    return var;
+    if (sym->getVarSlot() == 0xFFFFFFFF)
+      c->emit(asmjit::kX86InstIdMovsd,
+        asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), result.getOperand());
+
+    return result;
   }
 
-  JitVar vl, vr;
-
   // Handle the case that the operands are the same variable.
+  JitVar vl, vr;
   if (left->getNodeType() == kAstNodeVar &&
       right->getNodeType() == kAstNodeVar &&
       static_cast<AstVar*>(left)->getSymbol() == static_cast<AstVar*>(right)->getSymbol()) {
@@ -753,13 +798,13 @@ CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log
     a.setLogger(&logger);
   }
 
-  JitCompiler jitCompiler(&c);
+  JitCompiler jitCompiler(ast->getAllocator(), &c);
 
   if ((options & kOptionDisableSSE4_1) != 0)
     jitCompiler.enableSSE4_1 = false;
 
   jitCompiler.beginFunction();
-  jitCompiler.onProgram(ast->getProgramNode());
+  jitCompiler.compile(ast->getProgramNode(), ast->_numSlots);
   jitCompiler.endFunction();
 
   c.finalize();

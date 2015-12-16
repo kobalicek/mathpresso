@@ -193,7 +193,9 @@ static ContextImpl* mpContextClone(ContextImpl* otherD_) {
       clonedSym->_symbolFlags = sym->_symbolFlags;
       switch (type) {
         case kAstSymbolVariable:
-          clonedSym->setValue(sym->getValue());
+          clonedSym->setVarSlot(sym->getVarSlot());
+          clonedSym->setVarOffset(sym->getVarOffset());
+          clonedSym->_value = sym->getValue();
           break;
 
         case kAstSymbolIntrinsic:
@@ -321,8 +323,10 @@ Error Context::addBuiltIns(void) {
     AstSymbol* sym = d->_builder.newSymbol(name, hVal, kAstSymbolVariable, kAstScopeGlobal);
     MATHPRESSO_NULLCHECK(sym);
 
-    sym->setValue(c.value);
     sym->setSymbolFlag(kAstSymbolIsDeclared | kAstSymbolIsAssigned | kAstSymbolIsReadOnly);
+    sym->setVarSlot(0xFFFFFFFF);
+    sym->setVarOffset(0);
+    sym->setValue(c.value);
 
     d->_scope.putSymbol(sym);
   }
@@ -364,8 +368,9 @@ Error Context::addVariable(const char* name, int offset, unsigned int flags) {
   MATHPRESSO_PROPAGATE(mpContextMutable(this, &d));
   MATHPRESSO_ADD_SYMBOL(name, kAstSymbolVariable);
 
-  sym->setVarOffset(offset);
   sym->setSymbolFlag(kAstSymbolIsDeclared);
+  sym->setVarSlot(0xFFFFFFFF);
+  sym->setVarOffset(offset);
 
   if (flags & kVariableRO)
     sym->setSymbolFlag(kAstSymbolIsReadOnly);

@@ -117,7 +117,7 @@ Error Parser::parseStatement(AstBlock* block, uint32_t flags) {
   AstNode* expression;
 
   MATHPRESSO_PROPAGATE(block->willAdd());
-  MATHPRESSO_PROPAGATE(parseExpression(&expression));
+  MATHPRESSO_PROPAGATE(parseExpression(&expression, false));
   block->appendNode(expression);
 
   uToken = _tokenizer.peek(&token);
@@ -213,6 +213,10 @@ Error Parser::parseVariableDecl(AstBlock* block) {
 
     decl->setPosition(position);
     decl->setSymbol(vSym);
+
+    // Assign slot and fill to safe defaults.
+    vSym->setVarOffset(0);
+    vSym->setVarSlot(_ast->newSlotId());
     vSym->setNode(decl);
 
     // Parse possible assignment '='.
@@ -221,7 +225,7 @@ Error Parser::parseVariableDecl(AstBlock* block) {
 
     if (isAssigned) {
       AstNode* expression;
-      MATHPRESSO_PROPAGATE_(parseExpression(&expression), { _ast->deleteNode(decl); });
+      MATHPRESSO_PROPAGATE_(parseExpression(&expression, false), { _ast->deleteNode(decl); });
       decl->setChild(expression);
       uToken = _tokenizer.next(&token);
     }
@@ -248,7 +252,7 @@ Error Parser::parseVariableDecl(AstBlock* block) {
   return kErrorOk;
 }
 
-Error Parser::parseExpression(AstNode** pNode) {
+Error Parser::parseExpression(AstNode** pNode, bool isNested) {
   AstScope* scope = _currentScope;
 
   // It's important that the given expression is parsed in a way that it can be
@@ -379,7 +383,7 @@ _Repeat1:
         uint32_t position = token.getPosAsUInt();
 
         AstNode* zNode;
-        MATHPRESSO_PROPAGATE(parseExpression(&zNode));
+        MATHPRESSO_PROPAGATE(parseExpression(&zNode, true));
 
         if (_tokenizer.next(&token) != kTokenRParen)
           MATHPRESSO_PARSER_ERROR(token, "Expected a ')' token.");
@@ -407,7 +411,9 @@ _Unary: {
         else
           unary->setChild(opNode);
 
+        isNested = true;
         unary = opNode;
+
         goto _Repeat1;
       }
 
@@ -443,6 +449,24 @@ _Unary: {
       }
 
       // Parse a binary operator.
+      case kTokenAssign: {
+        op = kOpAssign;
+
+        // Check whether the assignment is valid.
+        if (tNode->getNodeType() != kAstNodeVar) {
+          printf("NodeType: %d\n", tNode->getNodeType());
+          MATHPRESSO_PARSER_ERROR(token, "Can't assign to a non-variable.");
+        }
+
+        AstSymbol* sym = static_cast<AstVar*>(tNode)->getSymbol();
+        if (sym->hasSymbolFlag(kAstSymbolIsReadOnly))
+          MATHPRESSO_PARSER_ERROR(token, "Can't assign to a read-only variable '%s'.", sym->getName());
+
+        if (isNested)
+          MATHPRESSO_PARSER_ERROR(token, "Invalid assignment inside an expression.");
+        goto _Binary;
+      }
+
       case kTokenEq          : op = kOpEq          ; goto _Binary;
       case kTokenNe          : op = kOpNe          ; goto _Binary;
       case kTokenGt          : op = kOpGt          ; goto _Binary;
@@ -454,7 +478,6 @@ _Unary: {
       case kTokenMul         : op = kOpMul         ; goto _Binary;
       case kTokenDiv         : op = kOpDiv         ; goto _Binary;
       case kTokenMod         : op = kOpMod         ; goto _Binary;
-      case kTokenAssign      : op = kOpAssign      ; goto _Binary;
 _Binary: {
         AstBinaryOp* zNode = _ast->newNode<AstBinaryOp>(op);
         MATHPRESSO_NULLCHECK(zNode);
@@ -532,7 +555,9 @@ _Binary: {
             zNode->setLeft(pNode);
           }
 
+          isNested = true;
           oNode = zNode;
+
           break;
         }
       }
@@ -580,7 +605,7 @@ Error Parser::parseCall(AstNode** pNodeOut) {
       AstNode* expression;
       Error err;
 
-      if ((err = callNode->willAdd()) != kErrorOk || (err = parseExpression(&expression)) != kErrorOk) {
+      if ((err = callNode->willAdd()) != kErrorOk || (err = parseExpression(&expression, true)) != kErrorOk) {
         _ast->deleteNode(callNode);
         return err;
       }

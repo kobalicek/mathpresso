@@ -54,7 +54,8 @@ static const AstNodeSize mpAstNodeSize[] = {
 AstBuilder::AstBuilder(Allocator* allocator)
   : _allocator(allocator),
     _globalScope(NULL),
-    _programNode(NULL) {}
+    _programNode(NULL),
+    _numSlots(0) {}
 AstBuilder::~AstBuilder() {}
 
 // ============================================================================

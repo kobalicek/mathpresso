@@ -64,7 +64,7 @@ struct Parser {
   MATHPRESSO_NOAPI Error parseBlockOrStatement(AstBlock* block);
 
   MATHPRESSO_NOAPI Error parseVariableDecl(AstBlock* block);
-  MATHPRESSO_NOAPI Error parseExpression(AstNode** pNodeOut);
+  MATHPRESSO_NOAPI Error parseExpression(AstNode** pNodeOut, bool isNested);
   MATHPRESSO_NOAPI Error parseCall(AstNode** pNodeOut);
 
   // --------------------------------------------------------------------------
