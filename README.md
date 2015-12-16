@@ -1,21 +1,86 @@
-MathPresso - Mathematical Expression Evaluator And Jit Compiler
-===============================================================
+MathPresso
+==========
 
-Official Repository: https://github.com/kobalicek/mathpresso-ng
+Mathematical Expression Parser And JIT Compiler.
 
+  * [Official Repository (kobalicek/mathpresso-ng)](https://github.com/kobalicek/mathpresso-ng)
+  * [Zlib Licensed](http://www.opensource.org/licenses/zlib-license.php)
+
+Introduction
+------------
+  
 MathPresso is a C++ library designed to parse mathematical expressions and compile them into machine code. It's much faster than traditional AST or byte-code based evaluators, because there is basically no overhead in the expression's execution. The JIT compiler is based on AsmJit and works on X86 and X64 architectures.
 
 This is an updated version of MathPresso that uses a stripped-off MPSL engine designed to work with scalar double precision floating points. It has many bugs fixed compared to the last version on google-code and contains improvements that can make execution of certain built-in functions (intrinsics) faster if the host CPU supports SSE4.1 (rounding, fraction, modulo, etc...).
 
 This is also a transitional version that is available to users that want to use MathPresso and cannot wait for the new MPSL engine, which is a work in progress.
 
-Usage
-=====
+Features
+--------
 
-MathPresso's expression is always created around a `mathpresso::Context`, which defines an environment the expression can access and use. For example if you plan to extend MathPresso with your own function or constant the `Context` is the way to go. The `Context` also defines inputs and outputs of the expression as is shown in the example below:
+  * Unary operators:
+    * Negate `-(x)`
+    * Not `!(x)`
+  * Arithmetic operators:
+    * Assignment `x = y`
+    * Addition `x + y`
+    * Subtraction `x - y`
+    * Multiplication `x * y`
+    * Division `x / y`
+    * Modulo `x % y`
+  * Comparison operators:
+    * Equal `x == y`
+    * Not equal `x != y`
+    * Greater `x > y`
+    * Greater or equal `x >= y`
+    * Lesser `x < y`
+    * Lesser or equal `x <= y`
+  * Functions defined by `addBuiltIns()`:
+    * Check for NaN `isnan(x)`
+    * Check for infinity `isinf(x)`
+    * Check for finite number `isfinite(x)`
+    * Get a sign bit `signbit(x)`
+    * Copy sign `copysign(x, y)`
+    * Round to nearest `round(x)`
+    * Round to even `roundeven(x)`
+    * Truncate `trunc(x)`
+    * Floor `floor(x)`
+    * Ceil `ceil(x)`
+    * Average value `avg(x, y)`
+    * Minimum value `min(x, y)`
+    * Maximum value `max(x, y)`
+    * Absolute value `abs(x)`
+    * Exponential `exp(x)`
+    * Logarithm `log(x)`
+    * Logarithm of base 2 `log2(x)`
+    * Logarithm of base 10 `log10(x)`
+    * Square root `sqrt(x)`
+    * Fraction `frac(x)`
+    * Reciprocal `recip(x)`
+    * Power `pow(x, y)`
+    * Sine `sin(x)`
+    * Cosine `cos(x)`
+    * Tangent `tan(x)`
+    * Hyperbolic sine `sinh(x)`
+    * Hyperbolic cosine `cosh(x)`
+    * Hyperbolic tangent `tanh(x)`
+    * Arcsine `asin(x)`
+    * Arccosine `acos(x)`
+    * Arctangent `atan(x)`
+    * Arctangent `atan2(x, y)`
+  * Constants defined by `addBuiltIns()`:
+    * INF (infinity)
+    * NaN (not a number)
+    * E (Euler's constant) `2.7182818284590452354`
+    * PI `3.14159265358979323846`
+
+Usage
+-----
+
+MathPresso's expression is always created around a `mathpresso::Context`, which defines an environment the expression can access and use. For example if you plan to extend MathPresso with your own function or constant the `Context` is the way to go. The `Context` also defines inputs and outputs of the expression as shown in the example below:
 
 ```c++
-#include "mathpresso/mathpresso.h"
+#include <mathpresso/mathpresso.h>
 
 int main(int argc, char* argv() {
   mathpresso::Context ctx;
@@ -30,12 +95,12 @@ int main(int argc, char* argv() {
   // so index them by using `sizeof(double)`, like a normal C array.
   //
   // The `addVariable()` also contains a third parameter that describes
-  // variable flags, use `kVariableRO` to make certain variable read-only.
+  // variable flags, use `kVariableRO` to make a certain variable read-only.
   ctx.addVariable("x", 0 * sizeof(double));
   ctx.addVariable("y", 1 * sizeof(double));
   ctx.addVariable("z", 2 * sizeof(double));
 
-  // Compile an expression.
+  // Compile the expression.
   //
   // The create parameters are:
   //   1. `mathpresso::Context&` - The expression's context / environment.
@@ -66,7 +131,7 @@ int main(int argc, char* argv() {
 The example above should be self-explanatory. The next example does the same but by using a `struct` instead of an array to address the expression's data:
 
 ```c++
-#include "mathpresso/mathpresso.h"
+#include <mathpresso/mathpresso.h>
 
 struct Data {
   inline Data(double x, double y, double z)
@@ -97,80 +162,8 @@ int main(int argc, char* argv() {
 }
 ```
 
-Supported Operators
-===================
-
-The following arithmetic operators are supported:
-
-  - Assigngment `x = y`
-  - Addition `x + y`
-  - Subtracion `x - y`
-  - Multiplication `x * y`
-  - Division `x / y`
-  - Modulo `x % y`
-
-The following comparision operators are supported:
-
-  - Equal `x == y`
-  - Not equal `x != y`
-  - Greater than `x > y`
-  - Greater or equal than `x >= y`
-  - Lesser than `x < y`
-  - Lesser or equal than `x <= y`
-
-The following unary operators are supported:
-  
-  - Negate `-(x)`
-  - Not `!(x)`
-
-The following functions are defined by `addBuiltIns()`:
-
-  - Check for NaN `isnan(x)`
-  - Check for Infinity `isinf(x)`
-  - Check for finite number `isfinite(x)`
-  - Get a sign bit `signbit(x)`
-  - Copy sign `copysign(x, y)`
-
-  - Round to nearest `round(x)`
-  - Round to even `roundeven(x)`
-  - Truncate `trunc(x)`
-  - Floor `floor(x)`
-  - Ceil `ceil(x)`
-
-  - Average value `avg(x, y)`
-  - Minimum value `min(x, y)`
-  - Maximum value `max(x, y)`
-
-  - Absolute value `abs(x)`
-  - Exponential `exp(x)`
-  - Logarithm `log(x)`
-  - Logarithm of base 2 `log2(x)`
-  - Logarithm of base 10 `log10(x)`
-  - Square root `sqrt(x)`
-  - Fraction `frac(x)`
-  - Reciprocal `recip(x)`
-  - Power `pow(x, y)`
-
-  - Sine `sin(x)`
-  - Cosine `cos(x)`
-  - Tangent `tan(x)`
-  - Hyperbolic sine `sinh(x)`
-  - Hyperbolic cosine `cosh(x)`
-  - Hyperbolic tangent `tanh(x)`
-  - Arc sine `asin(x)`
-  - Arc cosine `acos(x)`
-  - Arc tangent `atan(x)`
-  - Arc tangent `atan2(x, y)`
-
-The following constants are defined by `addBuiltIns()`:
-
-  - INF (infinity)
-  - NaN (not a number)
-  - E `2.7182818284590452354`
-  - PI `3.14159265358979323846`
-
 Error Handling
-==============
+--------------
 
 MathPresso allows to attach an `OutputLog` instance to retrieve a human readable error message in case of error. It can output the following:
 
@@ -185,8 +178,7 @@ Here is the minimum working example that uses `OutputLog` to display errors. The
 // This is a minimum working example that uses most of MathPresso features. It
 // shows how to compile and evaluate expressions and how to handle errors. It
 // also shows how to print the generated AST and machine code.
-#include "../mathpresso/mathpresso.h"
-
+#include <mathpresso/mathpresso.h>
 #include <stdio.h>
 
 // The data passed to the expression.
@@ -251,9 +243,9 @@ int main(int argc, char* argv[]) {
   mathpresso::Error err = exp.compile(ctx,
     "-(-(abs(x * y - floor(x)))) * z * (12.9 - 3)", options, &outputLog);
 
+  // Handle possible syntax or compilation error. The OutputLog has already
+  // received and printed the reason in a human readable form.
   if (err) {
-    // Handle possible error. The OutputLog has already received the reason
-    // in a human readable form.
     printf("ERROR %u\n", err);
     return 1;
   }
@@ -324,11 +316,18 @@ RESULT: -1885.514400
 ```
 
 Dependencies
-============
+------------
 
 AsmJit - 1.0 or later.
 
-Contact
-=======
+Support
+-------
 
-Petr Kobalicek <kobalicek.petr@gmail.com>
+Please consider a donation if you use the project and would like to keep it active in the future.
+
+  * [Donate by PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=QDRM6SRNG7378&lc=EN;&item_name=mathpresso&currency_code=EUR)
+
+Authors & Maintainers
+---------------------
+
+  * Petr Kobalicek <kobalicek.petr@gmail.com>

@@ -175,8 +175,41 @@ static ContextImpl* mpContextClone(ContextImpl* otherD_) {
 
   if (otherD_ != &mpContextNull) {
     ContextInternalImpl* otherD = static_cast<ContextInternalImpl*>(otherD_);
+    AstSymbolHashIterator it(otherD->_scope._symbols);
 
-    // TODO: Copy.
+    while (it.has()) {
+      AstSymbol* sym = it.get();
+
+      StringRef name(sym->_name, sym->_length);
+      uint32_t hVal = sym->getHVal();
+      uint32_t type = sym->getSymbolType();
+
+      AstSymbol* clonedSym = d->_builder.newSymbol(name, hVal, type, otherD->_scope.getScopeType());
+      if (MATHPRESSO_UNLIKELY(clonedSym == NULL)) {
+        delete d;
+        return NULL;
+      }
+
+      clonedSym->_symbolFlags = sym->_symbolFlags;
+      switch (type) {
+        case kAstSymbolVariable:
+          clonedSym->setValue(sym->getValue());
+          break;
+
+        case kAstSymbolIntrinsic:
+        case kAstSymbolFunction:
+          clonedSym->setOpType(sym->getOpType());
+          clonedSym->setFuncArgs(sym->getFuncArgs());
+          clonedSym->setFuncPtr(sym->getFuncPtr());
+          break;
+
+        default:
+          MATHPRESSO_ASSERT_NOT_REACHED();
+      }
+
+      d->_scope.putSymbol(clonedSym);
+      it.next();
+    }
   }
 
   return d;

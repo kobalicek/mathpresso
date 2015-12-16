@@ -378,6 +378,9 @@ struct AstSymbol : public HashNode {
   };
 };
 
+typedef Hash<StringRef, AstSymbol> AstSymbolHash;
+typedef HashIterator<StringRef, AstSymbol> AstSymbolHashIterator;
+
 // ============================================================================
 // [mathpresso::AstScope]
 // ============================================================================
@@ -450,7 +453,7 @@ struct AstScope {
   AstScope* _parent;
 
   //! Symbols defined in this scope.
-  Hash<StringRef, AstSymbol> _symbols;
+  AstSymbolHash _symbols;
 
   //! Scope type, see \ref AstScopeType.
   uint32_t _scopeType;

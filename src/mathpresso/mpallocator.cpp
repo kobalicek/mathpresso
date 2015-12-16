@@ -83,6 +83,7 @@ void* Allocator::_alloc(size_t size, size_t& allocatedSize) {
           _slots[slot] = reinterpret_cast<Slot*>(ptr);
 
           ptr += curSize;
+          remain -= curSize;
         }
       }
 

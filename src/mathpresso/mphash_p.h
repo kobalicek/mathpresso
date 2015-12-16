@@ -204,6 +204,63 @@ struct Hash : public HashBase {
 };
 
 // ============================================================================
+// [mathpresso::HashIterator<Key, Node>]
+// ============================================================================
+
+template<typename Key, typename Node>
+struct HashIterator {
+  MATHPRESSO_INLINE HashIterator(const Hash<Key, Node>& hash) { init(hash); }
+
+  MATHPRESSO_INLINE bool init(const Hash<Key, Node>& hash) {
+    Node** buckets = reinterpret_cast<Node**>(hash._data);
+    Node* node = buckets[0];
+
+    uint32_t index = 0;
+    uint32_t count = hash._bucketsCount;
+
+    while (node == NULL && ++index < count)
+      node = buckets[index];
+
+    _node = node;
+    _buckets = buckets;
+
+    _index = index;
+    _count = count;
+
+    return node != NULL;
+  }
+
+  MATHPRESSO_INLINE bool next() {
+    // Can't be called after it reached the end.
+    MATHPRESSO_ASSERT(has());
+
+    Node* node = static_cast<Node*>(_node->_next);
+    if (node == NULL) {
+      uint32_t index = _index;
+      uint32_t count = _count;
+
+      while (++index < count) {
+        node = _buckets[index];
+        if (node != NULL) break;
+      }
+      _index = index;
+    }
+
+    _node = node;
+    return node != NULL;
+  }
+
+  MATHPRESSO_INLINE bool has() const { return _node != NULL; }
+  MATHPRESSO_INLINE Node* get() const { return _node; }
+
+  Node* _node;
+  Node** _buckets;
+
+  uint32_t _index;
+  uint32_t _count;
+};
+
+// ============================================================================
 // [mathpresso::Map<Key, Value>]
 // ============================================================================
 

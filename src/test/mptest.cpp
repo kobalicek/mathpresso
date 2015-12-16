@@ -148,6 +148,8 @@ struct TestApp {
     double variables[] = { x, y, z, big };
 
     TestExpression tests[] = {
+      TEST_EXPRESSION( 0.0 ),
+
       TEST_EXPRESSION( x + y ),
       TEST_EXPRESSION( x - y ),
       TEST_EXPRESSION( x * y ),
@@ -190,6 +192,7 @@ struct TestApp {
       TEST_EXPRESSION( x >= y ),
 
       TEST_EXPRESSION( x + y == y - z ),
+      TEST_EXPRESSION( x * y == y * z ),
       TEST_EXPRESSION( x > y == y < z ),
 
       TEST_EXPRESSION( -x ),
@@ -315,8 +318,6 @@ struct TestApp {
         printf("[Success]: \"%s\" -> %f\n", exp, expected);
       else
         failed = true;
-
-      printf("\n");
     }
 
     return failed ? 1 : 0;
