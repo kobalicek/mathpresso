@@ -92,6 +92,7 @@ const OpInfo mpOpInfo[kOpCount] = {
   ROW(Max          , Max      , 2, 0, 0, 1, LTR | 0                                  , "max"      ),
   ROW(Pow          , Pow      , 2, 0, 0, 1, LTR |                    F(NopIfROne)    , "pow"      ),
   ROW(Atan2        , Atan2    , 2, 0, 0, 1, LTR | F(Trigonometric)                   , "atan2"    ),
+  ROW(Hypot        , Hypot    , 2, 0, 0, 1, LTR | F(Trigonometric)                   , "hypot"    ),
   ROW(CopySign     , CopySign , 2, 0, 0, 1, LTR | 0                                  , "copysign" )
 };
 #undef F

@@ -203,6 +203,7 @@ Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
       case kOpMax     : result = mpMax(lVal, rVal); break;
       case kOpPow     : result = mpPow(lVal, rVal); break;
       case kOpAtan2   : result = mpAtan2(lVal, rVal); break;
+      case kOpHypot   : result = mpHypot(lVal, rVal); break;
       case kOpCopySign: result = mpCopySign(lVal, rVal); break;
 
       default:
