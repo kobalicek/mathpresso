@@ -126,6 +126,8 @@ struct MATHPRESSO_NOAPI JitVar {
 
   // Flags.
   MATHPRESSO_INLINE bool isRO() const { return (flags & FLAG_RO) != 0; }
+  MATHPRESSO_INLINE void setRO() { flags |= FLAG_RO; }
+  MATHPRESSO_INLINE void clearRO() { flags &= ~FLAG_RO; }
 
   // Members.
   Operand op;
@@ -308,7 +310,7 @@ JitVar JitCompiler::onVarDecl(AstVarDecl* node) {
 
 JitVar JitCompiler::onVar(AstVar* node) {
   AstSymbol* sym = node->getSymbol();
-  if (sym->getVarSlot() == 0xFFFFFFFF)
+  if (sym->getVarSlot() == kInvalidSlot)
     return JitVar(asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), JitVar::FLAG_RO);
   
   JitVar result = varSlots[sym->getVarSlot()];
@@ -463,11 +465,20 @@ JitVar JitCompiler::onBinaryOp(AstBinaryOp* node) {
     MATHPRESSO_ASSERT(varNode->getNodeType() == kAstNodeVar);
 
     AstSymbol* sym = varNode->getSymbol();
-    JitVar result = registerVar(onNode(right));
+    uint32_t slotId = sym->getVarSlot();
 
-    if (sym->getVarSlot() == 0xFFFFFFFF)
+    if (slotId == kInvalidSlot && !varSlots[slotId].isNone())
+      varSlots[slotId].clearRO();
+
+    JitVar result = registerVar(onNode(right));
+    if (slotId == kInvalidSlot) {
       c->emit(asmjit::kX86InstIdMovsd,
-        asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), result.getOperand());
+        asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), result.getXmm());
+    }
+    else {
+      result.setRO();
+      varSlots[slotId] = result;
+    }
 
     return result;
   }

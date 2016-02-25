@@ -325,7 +325,7 @@ Error Context::addBuiltIns(void) {
     MATHPRESSO_NULLCHECK(sym);
 
     sym->setSymbolFlag(kAstSymbolIsDeclared | kAstSymbolIsAssigned | kAstSymbolIsReadOnly);
-    sym->setVarSlot(0xFFFFFFFF);
+    sym->setVarSlot(kInvalidSlot);
     sym->setVarOffset(0);
     sym->setValue(c.value);
 
@@ -370,7 +370,7 @@ Error Context::addVariable(const char* name, int offset, unsigned int flags) {
   MATHPRESSO_ADD_SYMBOL(name, kAstSymbolVariable);
 
   sym->setSymbolFlag(kAstSymbolIsDeclared);
-  sym->setVarSlot(0xFFFFFFFF);
+  sym->setVarSlot(kInvalidSlot);
   sym->setVarOffset(offset);
 
   if (flags & kVariableRO)

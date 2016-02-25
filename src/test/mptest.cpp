@@ -300,7 +300,11 @@ struct TestApp {
       TEST_INLINE(max(x, y)),
       TEST_INLINE(pow(x, y)),
 
-      TEST_STRING("var t=1; t=2; t", 2.0)
+      TEST_STRING("var a=1; a=2; a", 2.0),
+      TEST_STRING("var a=1, b=2; var t=a; a=b; b=t; a", 2.0),
+      TEST_STRING("var a=1, b=2; var t=a; a=b; b=t; b", 1.0),
+      TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; a", y),
+      TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; b", x)
     };
 
     unsigned int defaultOptions = mathpresso::kNoOptions;

@@ -234,7 +234,7 @@ Error Parser::parseVariableDecl(AstBlock* block) {
     vSym->setDeclared();
 
     // Parse the ',' or ';' tokens.
-    if (uToken == kTokenColon || uToken == kTokenSemicolon) {
+    if (uToken == kTokenComma || uToken == kTokenSemicolon) {
       block->appendNode(decl);
 
       // Token ';' terminates the declaration.
