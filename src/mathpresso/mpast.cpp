@@ -53,7 +53,7 @@ static const AstNodeSize mpAstNodeSize[] = {
 
 AstBuilder::AstBuilder(Allocator* allocator)
   : _allocator(allocator),
-    _globalScope(NULL),
+    _rootScope(NULL),
     _programNode(NULL),
     _numSlots(0) {}
 AstBuilder::~AstBuilder() {}
@@ -86,6 +86,34 @@ AstSymbol* AstBuilder::newSymbol(const StringRef& key, uint32_t hVal, uint32_t s
 
   kStr[kLen] = '\0';
   return new(p) AstSymbol(kStr, static_cast<uint32_t>(kLen), hVal, symbolType, scopeType);
+}
+
+AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
+  StringRef name(other->getName(), other->getLength());
+  AstSymbol* sym = newSymbol(name, other->getHVal(), other->getSymbolType(), kAstScopeShadow);
+
+  if (sym == NULL)
+    return NULL;
+
+  sym->_opType = other->_opType;
+  sym->_symbolFlags = other->_symbolFlags;
+
+  switch (sym->getSymbolType()) {
+    case kAstSymbolVariable: {
+      sym->_varSlot = other->_varSlot;
+      sym->_varOffset = other->_varOffset;
+      sym->_value = other->_value;
+      break;
+    }
+
+    case kAstSymbolFunction: {
+      sym->_funcPtr = other->_funcPtr;
+      sym->_funcArgs = other->_funcArgs;
+      break;
+    }
+  }
+
+  return sym;
 }
 
 void AstBuilder::deleteSymbol(AstSymbol* symbol) {
@@ -126,9 +154,9 @@ void AstBuilder::deleteNode(AstNode* node) {
 // ============================================================================
 
 Error AstBuilder::initProgramScope() {
-  if (_globalScope == NULL) {
-    _globalScope = newScope(NULL, kAstScopeGlobal);
-    MATHPRESSO_NULLCHECK(_globalScope);
+  if (_rootScope == NULL) {
+    _rootScope = newScope(NULL, kAstScopeGlobal);
+    MATHPRESSO_NULLCHECK(_rootScope);
   }
 
   if (_programNode == NULL) {

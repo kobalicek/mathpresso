@@ -40,8 +40,8 @@ struct Double {
   double val;
 };
 
-inline Double operator-(const Double &self) { return Double(-self.val); }
-inline Double operator!(const Double &self) { return Double(!self.val); }
+inline Double operator-(const Double& self) { return Double(-self.val); }
+inline Double operator!(const Double& self) { return Double(!self.val); }
 
 inline Double operator+(const Double& x, double y) { return Double(x.val + y); }
 inline Double operator-(const Double& x, double y) { return Double(x.val - y); }
@@ -301,13 +301,17 @@ struct TestApp {
       TEST_INLINE(pow(x, y)),
 
       TEST_STRING("var a=1; a=2; a", 2.0),
+      TEST_STRING("var a=x; a=y; a", y),
+
       TEST_STRING("var a=1, b=2; var t=a; a=b; b=t; a", 2.0),
       TEST_STRING("var a=1, b=2; var t=a; a=b; b=t; b", 1.0),
       TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; a", y),
       TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; b", x),
-      TEST_STRING("var a=x; a = a * a * a; a", x * x * x),
-      TEST_STRING("var a=x; a = a * a * a * a; a", x * x * x * x),
-      TEST_STRING("var a=x+1; a = a * a * a; a", (x+1.0) * (x+1.0) * (x+1.0))
+
+      TEST_STRING("var a=x; a=a*a*a; a", x * x * x),
+      TEST_STRING("var a=x; a=a*a*a*a; a", x * x * x * x),
+      TEST_STRING("var a=x+1; a=a*a*a; a", (x+1.0) * (x+1.0) * (x+1.0)),
+      TEST_STRING("var a=x+1; a=a*a*a*a; a", (x+1.0) * (x+1.0) * (x+1.0) * (x+1.0))
     };
 
     unsigned int defaultOptions = mathpresso::kNoOptions;

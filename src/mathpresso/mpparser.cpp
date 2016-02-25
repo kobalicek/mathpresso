@@ -312,13 +312,17 @@ Error Parser::parseExpression(AstNode** pNode, bool isNested) {
 
 _Repeat1:
     switch (_tokenizer.next(&token)) {
-      // Parse a variable, a constant, or a function-call. This section is
-      // repeated when a right-to-left unary has been parsed.
+      // Parse a variable, a constant, or a function-call. This can be repeated
+      // one or several times based on the expression type. For unary nodes it's
+      // repeated immediately, for binary nodes it's repeated after the binary
+      // node is created.
 
       // Parse a symbol (variable or function name).
       case kTokenSymbol: {
         StringRef str(_tokenizer._start + token.position, token.length);
-        AstSymbol* sym = scope->resolveSymbol(str, token.hVal);
+
+        AstScope* symScope;
+        AstSymbol* sym = scope->resolveSymbol(str, token.hVal, &symScope);
 
         if (sym == NULL)
           MATHPRESSO_PARSER_ERROR(token, "Unresolved symbol %.*s.", static_cast<int>(str.getLength()), str.getData());
@@ -330,17 +334,22 @@ _Repeat1:
           if (!sym->isDeclared())
             MATHPRESSO_PARSER_ERROR(token, "Can't use variable '%s' that is being declared.", sym->getName());
 
-          if (sym->isAssigned()) {
-            zNode = _ast->newNode<AstImm>(sym->getValue());
-            MATHPRESSO_NULLCHECK(zNode);
-          }
-          else {
-            zNode = _ast->newNode<AstVar>();
-            MATHPRESSO_NULLCHECK(zNode);
-            static_cast<AstVar*>(zNode)->setSymbol(sym);
+          // Put symbol to shadow scope if it's global. This is done lazily and
+          // only once per symbol when it's referenced.
+          if (symScope->isGlobal()) {
+            sym = _ast->shadowSymbol(sym);
+            MATHPRESSO_NULLCHECK(sym);
+
+            symScope = _ast->getRootScope();
+            symScope->putSymbol(sym);
           }
 
+          zNode = _ast->newNode<AstVar>();
+          MATHPRESSO_NULLCHECK(zNode);
+          static_cast<AstVar*>(zNode)->setSymbol(sym);
+
           zNode->setPosition(token.getPosAsUInt());
+          sym->incUsedCount();
         }
         else {
           // Will be parsed by `parseCall()` again.
@@ -453,10 +462,8 @@ _Unary: {
         op = kOpAssign;
 
         // Check whether the assignment is valid.
-        if (tNode->getNodeType() != kAstNodeVar) {
-          printf("NodeType: %d\n", tNode->getNodeType());
+        if (tNode->getNodeType() != kAstNodeVar)
           MATHPRESSO_PARSER_ERROR(token, "Can't assign to a non-variable.");
-        }
 
         AstSymbol* sym = static_cast<AstVar*>(tNode)->getSymbol();
         if (sym->hasSymbolFlag(kAstSymbolIsReadOnly))

@@ -437,7 +437,7 @@ Error Expression::compile(const Context& ctx, const char* body, unsigned int opt
 
   ContextImpl* d = ctx._d;
   if (d != &mpContextNull)
-    ast.getGlobalScope()->inheritFromContextScope(&static_cast<ContextInternalImpl*>(d)->_scope);
+    ast.getRootScope()->shadowContextScope(&static_cast<ContextInternalImpl*>(d)->_scope);
 
   // Setup basic data structures used during parsing and compilation.
   size_t len = ::strlen(body);
