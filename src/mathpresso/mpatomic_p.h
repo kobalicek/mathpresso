@@ -29,9 +29,6 @@ static MATHPRESSO_INLINE void mpAtomicSet(uintptr_t* atomic, size_t value) {
 
 #if defined(_MSC_VER)
 # if defined(__x86_64__) || defined(_WIN64) || defined(_M_IA64) || defined(_M_X64)
-#  pragma intrinsic (_InterlockedIncrement64)
-#  pragma intrinsic (_InterlockedDecrement64)
-#  pragma intrinsic (_InterlockedExchange64)
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicSetXchg(uintptr_t* atomic, uintptr_t value) {
   return _InterlockedExchange64((__int64 volatile *)atomic, static_cast<__int64>(value));
@@ -45,9 +42,6 @@ static MATHPRESSO_INLINE uintptr_t mpAtomicDec(uintptr_t* atomic) {
   return _InterlockedDecrement64((__int64 volatile *)&atomic);
 }
 # else
-#  pragma intrinsic (_InterlockedIncrement)
-#  pragma intrinsic (_InterlockedDecrement)
-#  pragma intrinsic (_InterlockedExchange)
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicSetXchg(uintptr_t* atomic, uintptr_t value) {
   return _InterlockedExchange((long volatile *)atomic, static_cast<long>(value));
