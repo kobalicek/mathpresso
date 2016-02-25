@@ -33,7 +33,7 @@ namespace mathpresso {
 #define ROW(opType, altType, params, precision, assignment, intrinsic, flags, name) \
   { \
     kOp##opType, kOp##altType, precision, 0, \
-    flags | (assignment == 1 ? kOpFlagAssign : 0) \
+    flags | (assignment != 0 ? kOpFlagAssign : 0) \
           | (params     == 1 ? kOpFlagUnary : \
              params     == 2 ? kOpFlagBinary : 0) \
           | (intrinsic  == 1 ? kOpFlagIntrinsic : 0), \

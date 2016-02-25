@@ -185,7 +185,6 @@ _Repeat:
         break;
 
       iPart = (iPart * 10.0) + static_cast<double>(static_cast<int>(c));
-
       if (++p == pEnd)
         goto _NumberEnd;
     }
@@ -207,7 +206,7 @@ _Repeat:
       }
     }
 
-    // Parse an optional exponent
+    // Parse an optional exponent.
     if (p != pEnd && mpGetLower(p[0]) == 'e') {
       if (++p == pEnd)
         goto _Invalid;
@@ -222,7 +221,7 @@ _Repeat:
         if (*p == '+')
           ++p;
       }
-      // Error if there is no number after the 'e'
+      // Error if there is no number after the 'e'.
       if (p == pEnd || mpCharClass[static_cast<uint8_t>(p[0])] > kTokenChar0x9)
         goto _Invalid;
 
