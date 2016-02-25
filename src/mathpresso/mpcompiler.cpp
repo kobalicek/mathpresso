@@ -303,20 +303,26 @@ JitVar JitCompiler::onVarDecl(AstVarDecl* node) {
     result = onNode(node->getChild());
 
   AstSymbol* sym = node->getSymbol();
-  varSlots[sym->getVarSlot()] = result;
+  uint32_t slotId = sym->getVarSlot();
+
+  result.setRO();
+  varSlots[slotId] = result;
 
   return result;
 }
 
 JitVar JitCompiler::onVar(AstVar* node) {
   AstSymbol* sym = node->getSymbol();
-  if (sym->getVarSlot() == kInvalidSlot)
+
+  if (sym->getVarSlot() == kInvalidSlot) {
     return JitVar(asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), JitVar::FLAG_RO);
-  
-  JitVar result = varSlots[sym->getVarSlot()];
-  if (result.isNone())
-    result = getConstantD64(mpGetNan());
-  return result;
+  }
+  else {
+    JitVar result = varSlots[sym->getVarSlot()];
+    if (result.isNone())
+      result = getConstantD64(mpGetNan());
+    return result;
+  }
 }
 
 JitVar JitCompiler::onImm(AstImm* node) {
@@ -466,9 +472,6 @@ JitVar JitCompiler::onBinaryOp(AstBinaryOp* node) {
 
     AstSymbol* sym = varNode->getSymbol();
     uint32_t slotId = sym->getVarSlot();
-
-    if (slotId == kInvalidSlot && !varSlots[slotId].isNone())
-      varSlots[slotId].clearRO();
 
     JitVar result = registerVar(onNode(right));
     if (slotId == kInvalidSlot) {
