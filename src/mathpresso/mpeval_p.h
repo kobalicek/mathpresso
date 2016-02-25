@@ -102,7 +102,8 @@ static MATHPRESSO_INLINE double mpAsin(double x) { return ::asin(x); }
 static MATHPRESSO_INLINE double mpAcos(double x) { return ::acos(x); }
 static MATHPRESSO_INLINE double mpAtan(double x) { return ::atan(x); }
 
-static MATHPRESSO_INLINE double mpAtan2(double x, double y) { return ::atan2(x, y); }
+static MATHPRESSO_INLINE double mpAtan2(double y, double x) { return ::atan2(y, x); }
+static MATHPRESSO_INLINE double mpHypot(double x, double y) { return ::hypot(x, y); }
 
 } // mathpresso namespace
 

@@ -172,21 +172,22 @@ _Repeat:
   // Save the first character of the token.
   pToken = p;
 
-  if (c <= kTokenChar0x9) {
-    double iPart = static_cast<double>(static_cast<int>(c));
+  if (c <= kTokenChar0x9 || c == kTokenCharDot) {
+    double iPart = 0.0;
     double fPart = 0.0;
     int fPos = 0;
+    double exponent = 0;
 
     // Parse the decimal part.
     for (;;) {
-      if (++p == pEnd)
-        goto _NumberEnd;
-
       c = static_cast<uint8_t>(p[0]) - '0';
       if (c > 9)
         break;
 
       iPart = (iPart * 10.0) + static_cast<double>(static_cast<int>(c));
+
+      if (++p == pEnd)
+        goto _NumberEnd;
     }
 
     // Parse an optional fraction.
@@ -206,6 +207,40 @@ _Repeat:
       }
     }
 
+    // Parse an optional exponent
+    if (p != pEnd && mpGetLower(p[0]) == 'e') {
+      if (++p == pEnd)
+        goto _Invalid;
+
+      bool neg;
+      if (*p == '-') {
+        neg = true;
+        ++p;
+      }
+      else {
+        neg = false;
+        if (*p == '+')
+          ++p;
+      }
+      // Error if there is no number after the 'e'
+      if (p == pEnd || mpCharClass[static_cast<uint8_t>(p[0])] > kTokenChar0x9)
+        goto _Invalid;
+
+      for (;;) {
+        c = static_cast<uint8_t>(p[0]) - '0';
+        if (c > 9)
+          break;
+
+        exponent = (exponent * 10) + static_cast<double>(static_cast<int>(c));
+
+        if (++p == pEnd)
+          goto _NumberEnd;
+      }
+
+      if (neg)
+        exponent = -exponent;
+    }
+
     // Error if there is an alpha-numeric character after the number.
     if (p != pEnd && mpCharClass[static_cast<uint8_t>(p[0])] <= kTokenCharSym) {
       goto _Invalid;
@@ -216,6 +251,8 @@ _NumberEnd:
       double val = iPart;
       if (fPos != 0)
         val += fPart * ::pow(10.0, fPos);
+      if (exponent != 0)
+        val *= ::pow(10.0, exponent);
 
       token->value = val;
       token->setData((size_t)(pToken - _start), (size_t)(p - pToken), 0, kTokenNumber);

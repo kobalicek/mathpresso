@@ -236,6 +236,7 @@ enum OpType {
   kOpMax,               // max(a, b)
   kOpPow,               // pow(a, b)
   kOpAtan2,             // atan2(a, b)
+  kOpHypot,             // hypot(a, b)
   kOpCopySign,          // copysign(a, b)
 
   //! \internal

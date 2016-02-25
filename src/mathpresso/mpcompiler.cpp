@@ -70,6 +70,7 @@ struct JitUtils {
       case kOpMax      : return (void*)(Arg2Func)mpMax<double>;
       case kOpPow      : return (void*)(Arg2Func)pow;
       case kOpAtan2    : return (void*)(Arg2Func)atan2;
+      case kOpHypot    : return (void*)(Arg2Func)hypot;
       case kOpCopySign : return (void*)(Arg2Func)mpCopySign;
 
       default:
@@ -543,6 +544,7 @@ emitInst: {
 
     case kOpPow:
     case kOpAtan2:
+    case kOpHypot:
       break;
 
     case kOpCopySign: {

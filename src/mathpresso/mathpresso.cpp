@@ -83,7 +83,7 @@ const OpInfo mpOpInfo[kOpCount] = {
   ROW(Gt           , Gt       , 2, 8, 0, 0, LTR | F(Condition)                       , ">"        ),
   ROW(Ge           , Ge       , 2, 8, 0, 0, LTR | F(Condition)                       , ">="       ),
   ROW(Add          , Add      , 2, 6, 0, 0, LTR | F(Arithmetic)    | F(NopIfZero)    , "+"        ),
-  ROW(Sub          , Sub      , 2, 6, 0, 0, LTR | F(Arithmetic)    | F(NopIfZero)    , "-"        ),
+  ROW(Sub          , Sub      , 2, 6, 0, 0, LTR | F(Arithmetic)    | F(NopIfRZero)   , "-"        ),
   ROW(Mul          , Mul      , 2, 5, 0, 0, LTR | F(Arithmetic)    | F(NopIfOne)     , "*"        ),
   ROW(Div          , Div      , 2, 5, 0, 0, LTR | F(Arithmetic)    | F(NopIfROne)    , "/"        ),
   ROW(Mod          , Mod      , 2, 5, 0, 0, LTR | F(Arithmetic)                      , "%"        ),
@@ -92,6 +92,7 @@ const OpInfo mpOpInfo[kOpCount] = {
   ROW(Max          , Max      , 2, 0, 0, 1, LTR | 0                                  , "max"      ),
   ROW(Pow          , Pow      , 2, 0, 0, 1, LTR |                    F(NopIfROne)    , "pow"      ),
   ROW(Atan2        , Atan2    , 2, 0, 0, 1, LTR | F(Trigonometric)                   , "atan2"    ),
+  ROW(Hypot        , Hypot    , 2, 0, 0, 1, LTR | F(Trigonometric)                   , "hypot"    ),
   ROW(CopySign     , CopySign , 2, 0, 0, 1, LTR | 0                                  , "copysign" )
 };
 #undef F
