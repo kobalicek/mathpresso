@@ -27,6 +27,7 @@ struct MyOutputLog : public mathpresso::OutputLog {
       printf("WARNING: %s\n", message);
   }
 };
+
 int main(int argc, char* argv[]) {
   mathpresso::Context ctx;
   mathpresso::Expression e;

@@ -100,7 +100,7 @@ AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
 
   switch (sym->getSymbolType()) {
     case kAstSymbolVariable: {
-      sym->_varSlot = other->_varSlot;
+      sym->_varSlotId = other->_varSlotId;
       sym->_varOffset = other->_varOffset;
       sym->_value = other->_value;
       break;
@@ -126,12 +126,6 @@ void AstBuilder::deleteNode(AstNode* node) {
   uint32_t length = node->getLength();
   AstNode** children = node->getChildren();
 
-  for (uint32_t i = 0; i < length; i++) {
-    AstNode* child = children[i];
-    if (child != NULL)
-      deleteNode(child);
-  }
-
   uint32_t nodeType = node->getNodeType();
   MATHPRESSO_ASSERT(mpAstNodeSize[nodeType].getNodeType() == nodeType);
 
@@ -144,6 +138,12 @@ void AstBuilder::deleteNode(AstNode* node) {
     case kAstNodeUnaryOp  : static_cast<AstUnaryOp*  >(node)->destroy(this); break;
     case kAstNodeBinaryOp : static_cast<AstBinaryOp* >(node)->destroy(this); break;
     case kAstNodeCall     : static_cast<AstCall*     >(node)->destroy(this); break;
+  }
+
+  for (uint32_t i = 0; i < length; i++) {
+    AstNode* child = children[i];
+    if (child != NULL)
+      deleteNode(child);
   }
 
   _allocator->release(node, mpAstNodeSize[nodeType].getNodeSize());

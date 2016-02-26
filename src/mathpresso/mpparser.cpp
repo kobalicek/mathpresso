@@ -214,9 +214,9 @@ Error Parser::parseVariableDecl(AstBlock* block) {
     decl->setPosition(position);
     decl->setSymbol(vSym);
 
-    // Assign slot and fill to safe defaults.
+    // Assign a slot and fill to safe defaults.
     vSym->setVarOffset(0);
-    vSym->setVarSlot(_ast->newSlotId());
+    vSym->setVarSlotId(_ast->newSlotId());
     vSym->setNode(decl);
 
     // Parse possible assignment '='.
@@ -226,7 +226,10 @@ Error Parser::parseVariableDecl(AstBlock* block) {
     if (isAssigned) {
       AstNode* expression;
       MATHPRESSO_PROPAGATE_(parseExpression(&expression, false), { _ast->deleteNode(decl); });
+
       decl->setChild(expression);
+      vSym->incWriteCount();
+
       uToken = _tokenizer.next(&token);
     }
 
@@ -234,11 +237,11 @@ Error Parser::parseVariableDecl(AstBlock* block) {
     vSym->setDeclared();
 
     // Parse the ',' or ';' tokens.
-    if (uToken == kTokenComma || uToken == kTokenSemicolon) {
+    if (uToken == kTokenComma || uToken == kTokenSemicolon || uToken == kTokenEnd) {
       block->appendNode(decl);
 
       // Token ';' terminates the declaration.
-      if (uToken == kTokenSemicolon)
+      if (uToken != kTokenComma)
         break;
     }
     else {
@@ -340,6 +343,7 @@ _Repeat1:
             sym = _ast->shadowSymbol(sym);
             MATHPRESSO_NULLCHECK(sym);
 
+            sym->setVarSlotId(_ast->newSlotId());
             symScope = _ast->getRootScope();
             symScope->putSymbol(sym);
           }
@@ -471,6 +475,8 @@ _Unary: {
 
         if (isNested)
           MATHPRESSO_PARSER_ERROR(token, "Invalid assignment inside an expression.");
+
+        sym->incWriteCount();
         goto _Binary;
       }
 
