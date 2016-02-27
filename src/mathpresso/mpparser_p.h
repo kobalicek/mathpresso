@@ -44,7 +44,7 @@ struct Parser {
   MATHPRESSO_INLINE Parser(AstBuilder* ast, ErrorReporter* errorReporter, const char* body, size_t len)
     : _ast(ast),
       _errorReporter(errorReporter),
-      _currentScope(ast->getGlobalScope()),
+      _currentScope(ast->getRootScope()),
       _tokenizer(body, len) {}
   MATHPRESSO_INLINE ~Parser() {}
 

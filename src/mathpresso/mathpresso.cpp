@@ -194,7 +194,7 @@ static ContextImpl* mpContextClone(ContextImpl* otherD_) {
       clonedSym->_symbolFlags = sym->_symbolFlags;
       switch (type) {
         case kAstSymbolVariable:
-          clonedSym->setVarSlot(sym->getVarSlot());
+          clonedSym->setVarSlotId(sym->getVarSlotId());
           clonedSym->setVarOffset(sym->getVarOffset());
           clonedSym->_value = sym->getValue();
           break;
@@ -325,7 +325,7 @@ Error Context::addBuiltIns(void) {
     MATHPRESSO_NULLCHECK(sym);
 
     sym->setSymbolFlag(kAstSymbolIsDeclared | kAstSymbolIsAssigned | kAstSymbolIsReadOnly);
-    sym->setVarSlot(0xFFFFFFFF);
+    sym->setVarSlotId(kInvalidSlot);
     sym->setVarOffset(0);
     sym->setValue(c.value);
 
@@ -370,7 +370,7 @@ Error Context::addVariable(const char* name, int offset, unsigned int flags) {
   MATHPRESSO_ADD_SYMBOL(name, kAstSymbolVariable);
 
   sym->setSymbolFlag(kAstSymbolIsDeclared);
-  sym->setVarSlot(0xFFFFFFFF);
+  sym->setVarSlotId(kInvalidSlot);
   sym->setVarOffset(offset);
 
   if (flags & kVariableRO)
@@ -437,7 +437,7 @@ Error Expression::compile(const Context& ctx, const char* body, unsigned int opt
 
   ContextImpl* d = ctx._d;
   if (d != &mpContextNull)
-    ast.getGlobalScope()->inheritFromContextScope(&static_cast<ContextInternalImpl*>(d)->_scope);
+    ast.getRootScope()->shadowContextScope(&static_cast<ContextInternalImpl*>(d)->_scope);
 
   // Setup basic data structures used during parsing and compilation.
   size_t len = ::strlen(body);

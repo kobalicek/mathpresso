@@ -40,8 +40,8 @@ struct Double {
   double val;
 };
 
-inline Double operator-(const Double &self) { return Double(-self.val); }
-inline Double operator!(const Double &self) { return Double(!self.val); }
+inline Double operator-(const Double& self) { return Double(-self.val); }
+inline Double operator!(const Double& self) { return Double(!self.val); }
 
 inline Double operator+(const Double& x, double y) { return Double(x.val + y); }
 inline Double operator-(const Double& x, double y) { return Double(x.val - y); }
@@ -62,21 +62,22 @@ inline Double operator/(const Double& x, const Double& y) { return Double(x.val 
 inline Double operator%(const Double& x, const Double& y) { return Double(fmod(x.val, y.val)); }
 
 // ============================================================================
-// [TestExpression]
-// ============================================================================
-
-struct TestExpression {
-  const char* expression;
-  double expected;
-};
-
-// ============================================================================
 // [TestOption]
 // ============================================================================
 
 struct TestOption {
   const char* name;
   unsigned int options;
+};
+
+// ============================================================================
+// [TestExpression]
+// ============================================================================
+
+struct TestExpression {
+  const char* expression;
+  double result;
+  double xyz[3];
 };
 
 // ============================================================================
@@ -91,7 +92,7 @@ struct TestOutputLog : public mathpresso::OutputLog {
       case kMessageError     : printf("[Failure]: %s (at %u)\n", message, column); break;
       case kMessageWarning   : printf("[Warning]: %s (at %u)\n", message, column); break;
       case kMessageAstInitial: printf("[AST-Initial]:\n%s", message); break;
-      case kMessageAstFinal  : printf("[AST-Initial]:\n%s", message); break;
+      case kMessageAstFinal  : printf("[AST-Final]:\n%s", message); break;
       case kMessageAsm       : printf("[Machine-Code]:\n%s", message); break;
     }
   }
@@ -174,13 +175,15 @@ struct TestApp {
     ctx.addVariable("z"  , 2 * sizeof(double));
     ctx.addVariable("big", 3 * sizeof(double));
 
-    double variables[] = { x, y, z, big };
-
-#define TEST_INLINE(exp) { #exp, (double)(exp) }
-#define TEST_STRING(str, result) { str, result }
+#define TEST_INLINE(exp) { #exp, (double)(exp), { x, y, z } }
+#define TEST_STRING(str, result) { str, result, { x, y, z } }
+#define TEST_OUTPUT(str, result, x, y, z) { str, result, { x, y, z } }
 
     TestExpression tests[] = {
       TEST_INLINE(0.0),
+      TEST_INLINE(10.0),
+      TEST_INLINE(100.0),
+      TEST_INLINE(1999.0),
 
       TEST_INLINE(x + y),
       TEST_INLINE(x - y),
@@ -300,7 +303,33 @@ struct TestApp {
       TEST_INLINE(max(x, y)),
       TEST_INLINE(pow(x, y)),
 
-      TEST_STRING("var t=1; t=2; t", 2.0)
+      TEST_STRING("var a=1; a", 1.0),
+      TEST_STRING("var a=199   * 2; a", 398),
+      TEST_STRING("var a=199.  * 2; a", 398),
+      TEST_STRING("var a=199.0 * 2; a", 398),
+
+      TEST_STRING("var a=1; a=2; a", 2.0),
+      TEST_STRING("var a=x; a=y; a", y),
+
+      TEST_STRING("var a=1, b=2; var t=a; a=b; b=t; a", 2.0),
+      TEST_STRING("var a=1, b=2; var t=a; a=b; b=t; b", 1.0),
+      TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; a", y),
+      TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; b", x),
+
+      TEST_STRING("var a=x; a=a*a*a; a", x * x * x),
+      TEST_STRING("var a=x; a=a*a*a*a; a", x * x * x * x),
+      TEST_STRING("var a=x+1; a=a*a*a; a", (x+1.0) * (x+1.0) * (x+1.0)),
+      TEST_STRING("var a=x+1; a=a*a*a*a; a", (x+1.0) * (x+1.0) * (x+1.0) * (x+1.0)),
+
+      TEST_OUTPUT("x = 11; y = 22; z = 33"   , 33.0, 11.0, 22.0, 33.0),
+      TEST_OUTPUT("x = 11; y = 22; z = 33;"  , 33.0, 11.0, 22.0, 33.0),
+      TEST_OUTPUT("x = 11; y = 22; z = 33; x", 11.0, 11.0, 22.0, 33.0),
+      TEST_OUTPUT("x =  y; y =  z; x = 99; x", 99.0, 99.0, z,    z   ),
+      TEST_OUTPUT("x =  y; y =  z; x = 99; y", z   , 99.0, z,    z   ),
+      TEST_OUTPUT("x =  y; y =  z; x = 99; z", z   , 99.0, z,    z   ),
+
+      TEST_OUTPUT("var t = x; x = y; y = z; z = t"   , x, y, z, x),
+      TEST_OUTPUT("var t = x; x = y; y = z; z = t; t", x, y, z, x)
     };
 
     unsigned int defaultOptions = mathpresso::kNoOptions;
@@ -321,8 +350,8 @@ struct TestApp {
     printf("  big = %f\n", (double)big);
 
     for (int i = 0; i < MATHPRESSO_ARRAY_SIZE(tests); i++) {
-      const char* exp = tests[i].expression;
-      double expected = tests[i].expected;
+      const TestExpression& test = tests[i];
+      const char* exp = test.expression;
       bool allOk = true;
 
       for (int j = 0; j < MATHPRESSO_ARRAY_SIZE(options); j++) {
@@ -340,16 +369,27 @@ struct TestApp {
           continue;
         }
 
-        double result = e.evaluate(variables);
-        if (result != expected) {
+        double arg[] = { x, y, z, big };
+        double result = e.evaluate(arg);
+
+        if (result != test.result ||
+            arg[0] != test.xyz[0] ||
+            arg[1] != test.xyz[1] ||
+            arg[2] != test.xyz[2]) {
           printf("[Failure]: \"%s\" (%s)\n", exp, option.name);
-          printf("           result(%f) != expected(%f)\n", result, expected);
+
+          static const char indentation[] = "          ";
+          if (result != test.result) printf("%s result(%f) != expected(%f)\n", indentation, result, test.result);
+          if (arg[0] != test.xyz[0]) printf("%s x(%f) != expected(%f)\n", indentation, arg[0], test.xyz[0]);
+          if (arg[1] != test.xyz[1]) printf("%s y(%f) != expected(%f)\n", indentation, arg[1], test.xyz[1]);
+          if (arg[2] != test.xyz[2]) printf("%s z(%f) != expected(%f)\n", indentation, arg[2], test.xyz[2]);
+
           allOk = false;
         }
       }
 
       if (allOk)
-        printf("[Success]: \"%s\" -> %f\n", exp, expected);
+        printf("[Success]: \"%s\" -> %f\n", exp, test.result);
       else
         failed = true;
     }

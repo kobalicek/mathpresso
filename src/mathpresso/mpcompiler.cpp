@@ -126,6 +126,8 @@ struct MATHPRESSO_NOAPI JitVar {
 
   // Flags.
   MATHPRESSO_INLINE bool isRO() const { return (flags & FLAG_RO) != 0; }
+  MATHPRESSO_INLINE void setRO() { flags |= FLAG_RO; }
+  MATHPRESSO_INLINE void clearRO() { flags &= ~FLAG_RO; }
 
   // Members.
   Operand op;
@@ -145,12 +147,12 @@ struct MATHPRESSO_NOAPI JitCompiler {
   void endFunction();
 
   // Variable Management.
-  JitVar copyVar(const JitVar& other);
+  JitVar copyVar(const JitVar& other, uint32_t flags);
   JitVar writableVar(const JitVar& other);
   JitVar registerVar(const JitVar& other);
 
   // Compiler.
-  void compile(AstBlock* node, uint32_t numSlots);
+  void compile(AstBlock* node, AstScope* rootScope, uint32_t numSlots);
 
   JitVar onNode(AstNode* node);
   JitVar onBlock(AstBlock* node);
@@ -224,39 +226,55 @@ void JitCompiler::endFunction() {
     c->embedConstPool(constLabel, constPool);
 }
 
-JitVar JitCompiler::copyVar(const JitVar& other) {
-  JitVar v(c->newXmmSd(), JitVar::FLAG_NONE);
+JitVar JitCompiler::copyVar(const JitVar& other, uint32_t flags) {
+  JitVar v(c->newXmmSd(), flags);
   c->emit(asmjit::kX86InstIdMovsd, v.getXmm(), other.getOperand());
   return v;
 }
 
 JitVar JitCompiler::writableVar(const JitVar& other) {
   if (other.isMem() || other.isRO())
-    return copyVar(other);
+    return copyVar(other, other.flags & ~JitVar::FLAG_RO);
   else
     return other;
 }
 
 JitVar JitCompiler::registerVar(const JitVar& other) {
   if (other.isMem())
-    return copyVar(other);
+    return copyVar(other, other.flags);
   else
     return other;
 }
 
-void JitCompiler::compile(AstBlock* node, uint32_t numSlots) {
+void JitCompiler::compile(AstBlock* node, AstScope* rootScope, uint32_t numSlots) {
   if (numSlots != 0) {
     varSlots = static_cast<JitVar*>(allocator->alloc(sizeof(JitVar) * numSlots));
     if (varSlots == NULL) return;
 
     for (uint32_t i = 0; i < numSlots; i++)
-      varSlots[i] = JitVar(c->newXmmSd(), JitVar::FLAG_NONE);
+      varSlots[i] = JitVar();
   }
 
+  // Result of the function or NaN.
   JitVar result = onBlock(node);
-  X86XmmVar var;
+
+  // Write altered global variables.
+  {
+    AstSymbolHashIterator it(rootScope->getSymbols());
+    while (it.has()) {
+      AstSymbol* sym = it.get();
+      if (sym->isGlobal() && sym->isAltered()) {
+        JitVar v = varSlots[sym->getVarSlotId()];
+        c->emit(asmjit::kX86InstIdMovsd,
+          asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), registerVar(v).getXmm());
+      }
+
+      it.next();
+    }
+  }
 
   // Return NaN if no result is given.
+  X86XmmVar var;
   if (result.isNone())
     var = registerVar(getConstantD64(mpGetNan())).getXmm();
   else
@@ -301,19 +319,32 @@ JitVar JitCompiler::onVarDecl(AstVarDecl* node) {
     result = onNode(node->getChild());
 
   AstSymbol* sym = node->getSymbol();
-  varSlots[sym->getVarSlot()] = result;
+  uint32_t slotId = sym->getVarSlotId();
+
+  result.setRO();
+  varSlots[slotId] = result;
 
   return result;
 }
 
 JitVar JitCompiler::onVar(AstVar* node) {
   AstSymbol* sym = node->getSymbol();
-  if (sym->getVarSlot() == 0xFFFFFFFF)
-    return JitVar(asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), JitVar::FLAG_RO);
-  
-  JitVar result = varSlots[sym->getVarSlot()];
-  if (result.isNone())
-    result = getConstantD64(mpGetNan());
+  uint32_t slotId = sym->getVarSlotId();
+
+  JitVar result = varSlots[slotId];
+  if (result.isNone()) {
+    if (sym->isGlobal()) {
+      result = JitVar(asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), JitVar::FLAG_RO);
+      varSlots[slotId] = result;
+      if (sym->getWriteCount() > 0)
+        result = copyVar(result, JitVar::FLAG_NONE);
+    }
+    else {
+      result = getConstantD64(mpGetNan());
+      varSlots[slotId] = result;
+    }
+  }
+
   return result;
 }
 
@@ -458,16 +489,19 @@ JitVar JitCompiler::onBinaryOp(AstBinaryOp* node) {
   AstNode* left  = node->getLeft();
   AstNode* right = node->getRight();
 
+  // Compile assignment.
   if (op == kOpAssign) {
     AstVar* varNode = reinterpret_cast<AstVar*>(left);
     MATHPRESSO_ASSERT(varNode->getNodeType() == kAstNodeVar);
 
     AstSymbol* sym = varNode->getSymbol();
-    JitVar result = registerVar(onNode(right));
+    uint32_t slotId = sym->getVarSlotId();
 
-    if (sym->getVarSlot() == 0xFFFFFFFF)
-      c->emit(asmjit::kX86InstIdMovsd,
-        asmjit::x86::ptr(variablesAddress, sym->getVarOffset()), result.getOperand());
+    JitVar result = onNode(right);
+    result.setRO();
+
+    sym->setAltered();
+    varSlots[slotId] = result;
 
     return result;
   }
@@ -763,7 +797,7 @@ JitVar JitCompiler::getConstantU64(uint64_t value) {
   if (constPool.add(&value, sizeof(uint64_t), offset) != asmjit::kErrorOk)
     return JitVar();
 
-  return JitVar(asmjit::x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_RO);
+  return JitVar(asmjit::x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
 }
 
 JitVar JitCompiler::getConstantU64AsPD(uint64_t value) {
@@ -774,7 +808,7 @@ JitVar JitCompiler::getConstantU64AsPD(uint64_t value) {
   if (constPool.add(&vec, sizeof(asmjit::Vec128), offset) != asmjit::kErrorOk)
     return JitVar();
 
-  return JitVar(asmjit::x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_RO);
+  return JitVar(asmjit::x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
 }
 
 JitVar JitCompiler::getConstantD64(double value) {
@@ -806,7 +840,7 @@ CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log
     jitCompiler.enableSSE4_1 = false;
 
   jitCompiler.beginFunction();
-  jitCompiler.compile(ast->getProgramNode(), ast->_numSlots);
+  jitCompiler.compile(ast->getProgramNode(), ast->getRootScope(), ast->_numSlots);
   jitCompiler.endFunction();
 
   c.finalize();

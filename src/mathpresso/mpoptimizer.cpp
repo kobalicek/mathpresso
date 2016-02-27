@@ -240,12 +240,6 @@ Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
       if (op.type == kOpAssign || sym->isAssigned()) {
         sym->setValue(val);
         sym->setAssigned();
-
-        AstImm* newNode = _ast->newNode<AstImm>(sym->getValue());
-        MATHPRESSO_NULLCHECK(newNode);
-
-        AstNode* oldNode = node->getParent()->replaceNode(node, newNode);
-        _ast->deleteNode(oldNode);
       }
     }
     else {

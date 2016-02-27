@@ -34,14 +34,18 @@ enum AstScopeType {
   //! Global scope.
   kAstScopeGlobal = 0,
 
+  //! Shadow scope acts like a global scope, however, it's mutable and can be
+  //! modified by the optimizer. Shadow scope is never used to store locals.
+  kAstScopeShadow = 1,
+
   //! Local scope.
-  kAstScopeLocal = 1,
+  kAstScopeLocal = 2,
 
   //! Nested scope.
   //!
   //! Always statically allocated and merged with the local scope before the
   //! scope is destroyed.
-  kAstScopeNested = 2
+  kAstScopeNested = 3
 };
 
 // ============================================================================
@@ -81,7 +85,13 @@ enum AstSymbolFlags {
   kAstSymbolIsAssigned = 0x0004,
 
   //! The symbol (variable) is read-only.
-  kAstSymbolIsReadOnly = 0x0008
+  kAstSymbolIsReadOnly = 0x0008,
+
+  //! The variable has been altered (written), at least once.
+  //!
+  //! Currently only useful for global variables so the JIT compiler can
+  //! perform write operation at the end of the generated function.
+  kAstSymbolIsAltered = 0x0010
 };
 
 // ============================================================================
@@ -159,7 +169,7 @@ struct AstBuilder {
 
   MATHPRESSO_INLINE Allocator* getAllocator() const { return _allocator; }
 
-  MATHPRESSO_INLINE AstScope* getGlobalScope() const { return _globalScope; }
+  MATHPRESSO_INLINE AstScope* getRootScope() const { return _rootScope; }
   MATHPRESSO_INLINE AstProgram* getProgramNode() const { return _programNode; }
 
   // --------------------------------------------------------------------------
@@ -170,6 +180,7 @@ struct AstBuilder {
   void deleteScope(AstScope* scope);
 
   AstSymbol* newSymbol(const StringRef& key, uint32_t hVal, uint32_t symbolType, uint32_t scopeType);
+  AstSymbol* shadowSymbol(const AstSymbol* other);
   void deleteSymbol(AstSymbol* symbol);
 
 #define MATHPRESSO_ALLOC_AST_OBJECT(_Size_) \
@@ -225,8 +236,8 @@ struct AstBuilder {
   //! String builder to build possible output messages.
   StringBuilder _sb;
 
-  //! Global scope.
-  AstScope* _globalScope;
+  //! Root scope.
+  AstScope* _rootScope;
   //! Root node.
   AstProgram* _programNode;
 
@@ -254,8 +265,8 @@ struct AstSymbol : public HashNode {
       _opType(kOpNone),
       _symbolFlags(scopeType == kAstScopeGlobal ? (int)kAstSymbolIsGlobal : 0),
       _value(),
-      _numReads(0),
-      _numWrites(0) {}
+      _usedCount(0),
+      _writeCount(0) {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -312,8 +323,8 @@ struct AstSymbol : public HashNode {
     _opType = static_cast<uint8_t>(opType);
   }
 
-  MATHPRESSO_INLINE uint32_t getVarSlot() const { return _varSlot; }
-  MATHPRESSO_INLINE void setVarSlot(uint32_t slot) { _varSlot = slot; }
+  MATHPRESSO_INLINE uint32_t getVarSlotId() const { return _varSlotId; }
+  MATHPRESSO_INLINE void setVarSlotId(uint32_t slotId) { _varSlotId = slotId; }
 
   MATHPRESSO_INLINE int32_t getVarOffset() const { return _varOffset; }
   MATHPRESSO_INLINE void setVarOffset(int32_t offset) { _varOffset = offset; }
@@ -340,10 +351,25 @@ struct AstSymbol : public HashNode {
   //! Set symbol to not be assigned (clears the \ref kAstSymbolIsAssigned flag).
   MATHPRESSO_INLINE void clearAssigned() { clearSymbolFlag(kAstSymbolIsAssigned); }
 
+  //! Get whether the global symbol has been altered.
+  MATHPRESSO_INLINE bool isAltered() const { return hasSymbolFlag(kAstSymbolIsAltered); }
+  //! Make a global symbol altered.
+  MATHPRESSO_INLINE void setAltered() { setSymbolFlag(kAstSymbolIsAltered); }
+
   //! Get the constant value, see `isAssigned()`.
   MATHPRESSO_INLINE double getValue() const { return _value; }
   //! Set `_isAssigned` to true and `_value` to `value`.
   MATHPRESSO_INLINE void setValue(double value) { _value = value; setAssigned(); }
+
+  MATHPRESSO_INLINE uint32_t getUsedCount() const { return _usedCount; }
+  MATHPRESSO_INLINE uint32_t getReadCount() const { return _usedCount - _writeCount; }
+  MATHPRESSO_INLINE uint32_t getWriteCount() const { return _writeCount; }
+
+  MATHPRESSO_INLINE void incUsedCount(uint32_t n = 1) { _usedCount += n; }
+  MATHPRESSO_INLINE void incWriteCount(uint32_t n = 1) { _writeCount += n; }
+
+  MATHPRESSO_INLINE void decUsedCount(uint32_t n = 1) { _usedCount -= n; }
+  MATHPRESSO_INLINE void decWriteCount(uint32_t n = 1) { _writeCount -= n; }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -364,15 +390,15 @@ struct AstSymbol : public HashNode {
   //! Flags, see \ref AstSymbolFlags.
   uint16_t _symbolFlags;
 
-  //! Number of reads (only used if the symbol is a local variable).
-  uint32_t _numReads;
-  //! Number of writes (only used if the symbol is a local variable).
-  uint32_t _numWrites;
+  //! Number of times the variable is used (both read and write count).
+  uint32_t _usedCount;
+  //! Number of times the variable is written.
+  uint32_t _writeCount;
 
   union {
     struct {
-      //! Variable slot (local variables).
-      uint32_t _varSlot;
+      //! Variable slot id.
+      uint32_t _varSlotId;
       //! Variable offset in data structure (in case the symbol is a global variable).
       int32_t _varOffset;
       //! The current value of the symbol (in case the symbol is an immediate).
@@ -413,12 +439,18 @@ struct AstScope {
   MATHPRESSO_INLINE AstBuilder* getAst() const { return _ast; }
   //! Get the parent scope (or NULL).
   MATHPRESSO_INLINE AstScope* getParent() const { return _parent; }
+  //! Get symbols hash-table.
+  MATHPRESSO_INLINE const AstSymbolHash& getSymbols() const { return _symbols; }
   //! Get scope type, see \ref AstScopeType.
   MATHPRESSO_INLINE uint32_t getScopeType() const { return _scopeType; }
 
-  MATHPRESSO_INLINE void inheritFromContextScope(AstScope* ctxScope) {
+  //! Get whether the scope type is `kAstScopeGlobal`.
+  MATHPRESSO_INLINE bool isGlobal() const { return _scopeType == kAstScopeGlobal; }
+
+  //! Make this scope a shadow of `ctxScope`.
+  MATHPRESSO_INLINE void shadowContextScope(AstScope* ctxScope) {
     _parent = ctxScope;
-    _scopeType = kAstScopeLocal;
+    _scopeType = kAstScopeShadow;
   }
 
   // --------------------------------------------------------------------------
@@ -785,6 +817,12 @@ struct AstVarDecl : public AstUnary {
     : AstUnary(ast, kAstNodeVarDecl),
       _symbol(NULL) {}
 
+  MATHPRESSO_INLINE void destroy(AstBuilder* ast) {
+    AstSymbol* sym = getSymbol();
+    if (sym != NULL)
+      sym->decUsedCount();
+  }
+
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
@@ -885,6 +923,16 @@ struct AstBinaryOp : public AstBinary {
 
   MATHPRESSO_INLINE AstBinaryOp(AstBuilder* ast, uint32_t op)
     : AstBinary(ast, kAstNodeBinaryOp) { setOp(op); }
+
+  MATHPRESSO_INLINE void destroy(AstBuilder* ast) {
+    if (mpOpInfo[getOp()].isAssignment() && hasLeft()) {
+      AstVar* var = static_cast<AstVar*>(getLeft());
+      AstSymbol* sym = var->getSymbol();
+
+      if (sym != NULL)
+        sym->decWriteCount();
+    }
+  }
 };
 
 // ============================================================================
