@@ -190,9 +190,7 @@ _Repeat:
     }
 
     // Parse an optional fraction.
-    c = static_cast<uint8_t>(p[0]);
-
-    if (c == '.') {
+    if (*p == '.') {
       for (;;) {
         if (++p == pEnd)
           goto _NumberEnd;
@@ -233,7 +231,7 @@ _Repeat:
         exponent = (exponent * 10) + static_cast<double>(static_cast<int>(c));
 
         if (++p == pEnd)
-          goto _NumberEnd;
+          break;
       }
 
       if (neg)

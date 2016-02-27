@@ -139,7 +139,7 @@ struct TestApp {
       argv(argv),
       E(2.7182818284590452354),
       PI(3.14159265358979323846),
-      x(1.5),
+      x(1.25),
       y(2.5),
       z(9.9),
       big(4503599627370496.0) {
@@ -184,6 +184,16 @@ struct TestApp {
       TEST_INLINE(10.0),
       TEST_INLINE(100.0),
       TEST_INLINE(1999.0),
+      TEST_INLINE(3.1415926535897932),
+      TEST_INLINE(3141592653589793.2),
+      TEST_INLINE(1.7976931348623157e+308),
+      TEST_INLINE(2.2250738585072014e-308),
+      TEST_INLINE(12345e+5),
+      TEST_INLINE(12345e-5),
+      TEST_INLINE(12345.e+5),
+      TEST_INLINE(12345.e-5),
+      TEST_INLINE(12345e5),
+      TEST_INLINE(123.45e5),
 
       TEST_INLINE(x + y),
       TEST_INLINE(x - y),
@@ -231,6 +241,7 @@ struct TestApp {
       TEST_INLINE(x > y == y < z),
 
       TEST_INLINE(-x),
+      TEST_INLINE(0.0 - x),
       TEST_INLINE(-1.0 + x),
       TEST_INLINE(-(-(-1.0))),
       TEST_INLINE(-(-(-x))),
@@ -244,39 +255,50 @@ struct TestApp {
 
       TEST_INLINE(round(x)),
       TEST_INLINE(round(y)),
+      TEST_INLINE(round(z)),
       TEST_INLINE(round(big)),
       TEST_INLINE(round(-x)),
       TEST_INLINE(round(-y)),
+      TEST_INLINE(round(-z)),
       TEST_INLINE(round(-big)),
 
       TEST_INLINE(roundeven(x)),
       TEST_INLINE(roundeven(y)),
+      TEST_INLINE(roundeven(z)),
       TEST_INLINE(roundeven(big)),
       TEST_INLINE(roundeven(-x)),
       TEST_INLINE(roundeven(-y)),
+      TEST_INLINE(roundeven(-z)),
       TEST_INLINE(roundeven(-big)),
 
       TEST_INLINE(trunc(x)),
       TEST_INLINE(trunc(y)),
+      TEST_INLINE(trunc(z)),
       TEST_INLINE(trunc(big)),
       TEST_INLINE(trunc(-x)),
       TEST_INLINE(trunc(-y)),
+      TEST_INLINE(trunc(-z)),
       TEST_INLINE(trunc(-big)),
 
       TEST_INLINE(floor(x)),
       TEST_INLINE(floor(y)),
+      TEST_INLINE(floor(z)),
       TEST_INLINE(floor(big)),
       TEST_INLINE(floor(-x)),
       TEST_INLINE(floor(-y)),
+      TEST_INLINE(floor(-z)),
       TEST_INLINE(floor(-big)),
 
       TEST_INLINE(ceil(x)),
       TEST_INLINE(ceil(y)),
+      TEST_INLINE(ceil(z)),
       TEST_INLINE(ceil(big)),
       TEST_INLINE(ceil(-x)),
       TEST_INLINE(ceil(-y)),
+      TEST_INLINE(ceil(-z)),
       TEST_INLINE(ceil(-big)),
 
+      TEST_INLINE(abs(x)),
       TEST_INLINE(abs(-x)),
       TEST_INLINE(abs(-big)),
 
@@ -298,9 +320,13 @@ struct TestApp {
       TEST_INLINE(cos(x)),
       TEST_INLINE(tan(x)),
       TEST_INLINE(sin(x) * cos(y) * tan(z)),
+      TEST_INLINE(atan2(y, x)),
+      TEST_INLINE(hypot(x, y)),
       TEST_INLINE(avg(x, y)),
       TEST_INLINE(min(x, y)),
+      TEST_INLINE(min(-x, y)),
       TEST_INLINE(max(x, y)),
+      TEST_INLINE(max(x, -y)),
       TEST_INLINE(pow(x, y)),
 
       TEST_STRING("var a=1; a", 1.0),
@@ -379,7 +405,7 @@ struct TestApp {
           printf("[Failure]: \"%s\" (%s)\n", exp, option.name);
 
           static const char indentation[] = "          ";
-          if (result != test.result) printf("%s result(%f) != expected(%f)\n", indentation, result, test.result);
+          if (result != test.result) printf("%s result(%.17g) != expected(%.17g)\n", indentation, result, test.result);
           if (arg[0] != test.xyz[0]) printf("%s x(%f) != expected(%f)\n", indentation, arg[0], test.xyz[0]);
           if (arg[1] != test.xyz[1]) printf("%s y(%f) != expected(%f)\n", indentation, arg[1], test.xyz[1]);
           if (arg[2] != test.xyz[2]) printf("%s z(%f) != expected(%f)\n", indentation, arg[2], test.xyz[2]);
@@ -389,7 +415,8 @@ struct TestApp {
       }
 
       if (allOk)
-        printf("[Success]: \"%s\" -> %f\n", exp, test.result);
+        printf(i < 14 ? "[Success]: \"%s\" -> %.17g\n" // Extra precision for floating-point tests.
+                      : "[Success]: \"%s\" -> %f\n", exp, test.result);
       else
         failed = true;
     }
