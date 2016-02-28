@@ -10,6 +10,7 @@
 
 // [Dependencies]
 #include "./mathpresso_p.h"
+#include "./mpstrtod_p.h"
 
 namespace mathpresso {
 
@@ -158,10 +159,11 @@ struct Tokenizer {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Tokenizer(const char* s, size_t sLen) {
-    _p     = s;
-    _start = s;
-    _end   = s + sLen;
+  MATHPRESSO_INLINE Tokenizer(const char* s, size_t sLen)
+    : _p(s),
+      _start(s),
+      _end(s + sLen),
+      _strtod() {
     _token.reset();
   }
 
@@ -210,6 +212,7 @@ struct Tokenizer {
   const char* _start;
   const char* _end;
 
+  StrToD _strtod;
   Token _token;
 };
 

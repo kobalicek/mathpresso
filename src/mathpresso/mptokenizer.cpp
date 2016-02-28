@@ -8,6 +8,7 @@
 #define MATHPRESSO_EXPORTS
 
 // [Dependencies]
+#include "./mpeval_p.h"
 #include "./mphash_p.h"
 #include "./mptokenizer_p.h"
 
@@ -116,6 +117,46 @@ static const uint8_t mpCharClass[] = {
 //! character on the input that will be lowercased by setting the 0x20 bit on.
 static MATHPRESSO_INLINE uint32_t mpGetLower(uint32_t c) { return c | 0x20; }
 
+//! \internal
+enum { kSafeDigits = 15 };
+
+//! \internal
+static const double mpDoublePow10Table[] = {
+  1e-0 , 1e-1 , 1e-2 , 1e-3 , 1e-4 , 1e-5 , 1e-6 , 1e-7 ,
+  1e-8 , 1e-9 , 1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15,
+  1e-16, 1e-17, 1e-18, 1e-19
+};
+
+//! \internal
+static const uint64_t mpUInt64Pow10Table[] = {
+  MATHPRESSO_UINT64_C(1),
+  MATHPRESSO_UINT64_C(10), 
+  MATHPRESSO_UINT64_C(100),
+  MATHPRESSO_UINT64_C(1000),
+  MATHPRESSO_UINT64_C(10000),
+  MATHPRESSO_UINT64_C(100000),
+  MATHPRESSO_UINT64_C(1000000),
+  MATHPRESSO_UINT64_C(10000000),
+  MATHPRESSO_UINT64_C(100000000),
+  MATHPRESSO_UINT64_C(1000000000),
+  MATHPRESSO_UINT64_C(10000000000),
+  MATHPRESSO_UINT64_C(100000000000),
+  MATHPRESSO_UINT64_C(1000000000000),
+  MATHPRESSO_UINT64_C(10000000000000),
+  MATHPRESSO_UINT64_C(100000000000000),
+  MATHPRESSO_UINT64_C(1000000000000000),
+  MATHPRESSO_UINT64_C(10000000000000000),
+  MATHPRESSO_UINT64_C(100000000000000000),
+  MATHPRESSO_UINT64_C(1000000000000000000),
+  MATHPRESSO_UINT64_C(10000000000000000000)
+  // Maximum value:   18446744073709551615
+};
+
+//! \internal
+static MATHPRESSO_INLINE double mpSafeUInt64ToDouble(uint64_t x) {
+  return static_cast<double>(static_cast<int64_t>(x));
+}
+
 #define CHAR4X(C0, C1, C2, C3) \
   ( (static_cast<uint32_t>(C0)      ) + \
     (static_cast<uint32_t>(C1) <<  8) + \
@@ -125,7 +166,7 @@ static MATHPRESSO_INLINE uint32_t mpGetLower(uint32_t c) { return c | 0x20; }
 //! \internal
 //!
 //! Converts a given symbol `s` of `sLen` to a keyword token.
-static uint32_t mpGetKeyword(const char* s, size_t sLen) {
+static uint32_t mpGetKeyword(const uint8_t* s, size_t sLen) {
   if (sLen == 3 && s[0] == 'v' && s[1] == 'a' && s[2] == 'r')
     return kTokenVar;
 
@@ -151,17 +192,22 @@ uint32_t Tokenizer::next(Token* token) {
   }
 
   // Input string.
-  const char* p = _p;
-  const char* pToken = p;
-  const char* pEnd = _end;
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(_p);
+  const uint8_t* pToken = p;
+
+  const uint8_t* pStart = reinterpret_cast<const uint8_t*>(_start);
+  const uint8_t* pEnd = reinterpret_cast<const uint8_t*>(_end);
+
+  // --------------------------------------------------------------------------
+  // [Spaces]
+  // --------------------------------------------------------------------------
 
 _Repeat:
-  // Skip spaces.
   for (;;) {
     if (p == pEnd)
       goto _EndOfInput;
 
-    hVal = static_cast<uint8_t>(p[0]);
+    hVal = p[0];
     c = mpCharClass[hVal];
 
     if (c != kTokenCharSpc)
@@ -172,120 +218,214 @@ _Repeat:
   // Save the first character of the token.
   pToken = p;
 
-  if (c <= kTokenChar0x9 || c == kTokenCharDot) {
-    double iPart = 0.0;
-    double fPart = 0.0;
-    int fPos = 0;
-    double exponent = 0;
+  // --------------------------------------------------------------------------
+  // [Number | Dot]
+  // --------------------------------------------------------------------------
 
-    // Parse the decimal part.
-    for (;;) {
-      c = static_cast<uint8_t>(p[0]) - '0';
+  if (c <= kTokenChar0x9 || c == kTokenCharDot) {
+    // Parsing floating point is not that simple as it looks. To simplify the
+    // most common cases we parse floating points up to `kSafeDigits` and then
+    // use libc `strtod()` function to parse numbers that are more complicated.
+
+    // Values have to be unsigned to allow overflow.
+    uint64_t dVal = 0;
+    uint64_t fVal = 0;
+    uint32_t eVal = 0;
+
+    size_t dLen = 0;
+    size_t fLen = 0;
+    size_t eLen = 0;
+
+    // Parse a decimal part.
+    do {
+      c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
       if (c > 9)
         break;
 
-      iPart = (iPart * 10.0) + static_cast<double>(static_cast<int>(c));
-      if (++p == pEnd)
-        goto _NumberEnd;
-    }
+      dVal = dVal * 10 + c;
+      dLen += dVal != 0; // Don't count leading zeros.
+    } while (++p != pEnd);
 
-    // Parse an optional fraction.
-    c = static_cast<uint8_t>(p[0]);
+    // Parse a fractional part.
+    if (p != pEnd && p[0] == '.') {
+      // Counts the number of trailing zeros.
+      size_t scale = 0;
 
-    if (c == '.') {
-      for (;;) {
-        if (++p == pEnd)
-          goto _NumberEnd;
-
-        c = static_cast<uint8_t>(p[0]) - '0';
+      while (++p != pEnd) {
+        c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
         if (c > 9)
           break;
+        scale++;
 
-        fPart = (fPart * 10.0) + static_cast<double>(static_cast<int>(c));
-        fPos--;
+        if (c != 0) {
+          if (scale < MATHPRESSO_ARRAY_SIZE(mpUInt64Pow10Table))
+            fVal = fVal * mpUInt64Pow10Table[scale] + c;
+          fLen += scale;
+          scale = 0;
+        }
+      }
+
+      // Token is a dot '.'.
+      if ((size_t)(p - pToken) == 1) {
+        _p = reinterpret_cast<const char*>(p);
+        return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenDot);
       }
     }
 
-    // Parse an optional exponent.
+    // Parse an exponential part.
+    size_t xLen = dLen + fLen;
+
     if (p != pEnd && mpGetLower(p[0]) == 'e') {
       if (++p == pEnd)
         goto _Invalid;
 
-      bool neg;
-      if (*p == '-') {
-        neg = true;
-        ++p;
-      }
-      else {
-        neg = false;
-        if (*p == '+')
-          ++p;
-      }
-      // Error if there is no number after the 'e'.
-      if (p == pEnd || mpCharClass[static_cast<uint8_t>(p[0])] > kTokenChar0x9)
-        goto _Invalid;
+      c = p[0];
+      bool negative = c == '-';
+      if (negative || c == '+')
+        if (++p == pEnd)
+          goto _Invalid;
 
-      for (;;) {
-        c = static_cast<uint8_t>(p[0]) - '0';
+      do {
+        c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
         if (c > 9)
           break;
 
-        exponent = (exponent * 10) + static_cast<double>(static_cast<int>(c));
+        eVal = eVal * 10 + c;
+        eLen++;
+      } while (++p != pEnd);
 
-        if (++p == pEnd)
-          goto _NumberEnd;
+      // Error if there is no number after the 'e' token.
+      if (eLen == 0)
+        goto _Invalid;
+
+      // If less than 10 digits it's safe to assumt the exponent is zero if
+      // `eVal` is zero. Otherwise it could have overflown (32-bit uint).
+      if (eVal == 0 && eLen < 10)
+        eLen = 0;
+
+      // If the exponent keeps the number within a safe boundary it can be
+      // just scaled here instead of bailing out to C's `strtod()`.
+      if (eLen < 2 && xLen <= kSafeDigits && eVal != 0) {
+        int decPt = static_cast<int>(dLen);
+        int digits = static_cast<int>(xLen);
+
+        decPt += !negative ? static_cast<int>(eVal) : -static_cast<int>(eVal);
+        digits = decPt < 0 ? digits - decPt : mpMax<int>(digits, decPt);
+
+        // The number of digits after the exponent is applied should be less
+        // than a maximum number of safe digits.
+        if (digits <= kSafeDigits) {
+          // First compose the `dVal` and `fVal` parts and then decompose them
+          // back depending on where the exponent has moved he decimal point.
+          MATHPRESSO_ASSERT(fLen < MATHPRESSO_ARRAY_SIZE(mpUInt64Pow10Table));
+          uint64_t composed = dVal * mpUInt64Pow10Table[fLen] + fVal;
+
+          if (decPt <= 0) {
+            // Decimal point has moved to the left leaving the decimal part
+            // zero. This is easy as increasing `fLen` will simply scale the
+            // resulting number.
+            dVal = 0;
+            fVal = composed;
+
+            dLen = 0;
+            fLen = static_cast<unsigned int>(digits);
+          }
+          else if (static_cast<unsigned int>(decPt) >= xLen) {
+            // Decimal point has moved to the right leaving the fractional
+            // part zero. This is also easy as we just need to scale the
+            // `composed` value and clear the fractional part.
+            dVal = composed * mpUInt64Pow10Table[static_cast<unsigned int>(decPt) - xLen];
+            dLen = static_cast<unsigned int>(digits);
+
+            fVal = 0;
+            fLen = 0;
+          }
+          else {
+            MATHPRESSO_ASSERT(digits - decPt < MATHPRESSO_ARRAY_SIZE(mpUInt64Pow10Table));
+            uint64_t denom = mpUInt64Pow10Table[digits - decPt];
+
+            dVal = composed / denom;
+            fVal = composed % denom;
+
+            dLen = static_cast<unsigned int>(decPt);
+            fLen = static_cast<unsigned int>(digits - decPt);
+          }
+
+          eVal = 0;
+          eLen = 0;
+          xLen = static_cast<unsigned int>(digits);
+        }
       }
-
-      if (neg)
-        exponent = -exponent;
     }
 
-    // Error if there is an alpha-numeric character after the number.
-    if (p != pEnd && mpCharClass[static_cast<uint8_t>(p[0])] <= kTokenCharSym) {
+    // Error if there is an alpha-numeric character right next to the number.
+    if (p != pEnd && mpCharClass[p[0]] <= kTokenCharSym)
       goto _Invalid;
+
+    double val;
+    size_t len = (size_t)(p - pToken);
+
+    if (xLen <= kSafeDigits && eLen == 0) {
+      val = mpSafeUInt64ToDouble(dVal);
+      if (fLen != 0)
+        val += mpSafeUInt64ToDouble(fVal) * mpDoublePow10Table[fLen];
+    }
+    else {
+      // Using libc's strtod is not optimal, but it's precise for complex cases.
+      char tmp[512];
+      char* buf = tmp;
+
+      if (len >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(len))) == NULL)
+        return kTokenInvalid;
+
+      memcpy(buf, pToken, len);
+      buf[len] = '\0';
+
+      val = _strtod.conv(buf, NULL);
+
+      if (buf != tmp)
+        ::free(buf);
     }
 
-_NumberEnd:
-    {
-      double val = iPart;
-      if (fPos != 0)
-        val += fPart * ::pow(10.0, fPos);
-      if (exponent != 0)
-        val *= ::pow(10.0, exponent);
+    token->value = val;
+    token->setData((size_t)(pToken - pStart), len, 0, kTokenNumber);
 
-      token->value = val;
-      token->setData((size_t)(pToken - _start), (size_t)(p - pToken), 0, kTokenNumber);
-    }
-
-    _p = p;
+    _p = reinterpret_cast<const char*>(p);
     return kTokenNumber;
   }
 
-  // Symbol or Keyword.
+  // --------------------------------------------------------------------------
+  // [Symbol | Keyword]
+  // --------------------------------------------------------------------------
+
   else if (c <= kTokenCharSym) {
     // We always generate the hVal during tokenization to improve performance.
-    size_t len;
-
     while (++p != pEnd) {
-      uint32_t ord = static_cast<uint8_t>(p[0]);
+      uint32_t ord = p[0];
       c = mpCharClass[ord];
       if (c > kTokenCharSym)
         break;
       hVal = HashUtils::hashChar(hVal, ord);
     }
 
-    len = (size_t)(p - pToken);
-    _p = p;
-    return token->setData((size_t)(pToken - _start), len, hVal, mpGetKeyword(pToken, len));
+    size_t len = (size_t)(p - pToken);
+    _p = reinterpret_cast<const char*>(p);
+    return token->setData((size_t)(pToken - pStart), len, hVal, mpGetKeyword(pToken, len));
   }
 
-  // Single-Char Punctuation.
+  // --------------------------------------------------------------------------
+  // [Single-Char]
+  // --------------------------------------------------------------------------
+
   else if (c <= kTokenCharSingleCharTokenEnd) {
-    _p = ++p;
-    return token->setData((size_t)(pToken - _start), (size_t)(p - pToken), 0, c);
+    _p = reinterpret_cast<const char*>(++p);
+    return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, c);
   }
 
-  // Single-Char/Multi-Char Punctuation.
+  // --------------------------------------------------------------------------
+  // [Single-Char | Multi-Char]
+  // --------------------------------------------------------------------------
+
   else if (c < kTokenCharSpc) {
     p++;
     uint32_t c1 = 0;
@@ -381,13 +521,21 @@ _NumberEnd:
         break;
     }
 
-    _p = p;
-    return token->setData((size_t)(pToken - _start), (size_t)(p - pToken), 0, c);
+    _p = reinterpret_cast<const char*>(p);
+    return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, c);
   }
 
+  // --------------------------------------------------------------------------
+  // [Invalid]
+  // --------------------------------------------------------------------------
+
 _Invalid:
-  _p = pToken;
-  return token->setData((size_t)(pToken - _start), (size_t)(p - pToken), 0, kTokenInvalid);
+  _p = reinterpret_cast<const char*>(pToken);
+  return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenInvalid);
+
+  // --------------------------------------------------------------------------
+  // [Comment]
+  // --------------------------------------------------------------------------
 
 _Comment:
   for (;;) {
@@ -399,9 +547,13 @@ _Comment:
       goto _Repeat;
   }
 
+  // --------------------------------------------------------------------------
+  // [EOI]
+  // --------------------------------------------------------------------------
+
 _EndOfInput:
   _p = _end;
-  return token->setData((size_t)(pToken - _start), (size_t)(p - pToken), 0, kTokenEnd);
+  return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenEnd);
 }
 
 } // mathpresso namespace

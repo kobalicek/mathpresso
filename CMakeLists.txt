@@ -174,6 +174,7 @@ mathpresso_add_source(MATHPRESSO_SRC mathpresso
   mpoptimizer_p.h
   mpparser.cpp
   mpparser_p.h
+  mpstrtod_p.h
   mptokenizer.cpp
   mptokenizer_p.h
 )

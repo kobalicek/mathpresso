@@ -228,7 +228,8 @@ void JitCompiler::endFunction() {
 
 JitVar JitCompiler::copyVar(const JitVar& other, uint32_t flags) {
   JitVar v(c->newXmmSd(), flags);
-  c->emit(asmjit::kX86InstIdMovsd, v.getXmm(), other.getOperand());
+  c->emit(other.isXmm() ? asmjit::kX86InstIdMovapd : asmjit::kX86InstIdMovsd,
+    v.getXmm(), other.getOperand());
   return v;
 }
 

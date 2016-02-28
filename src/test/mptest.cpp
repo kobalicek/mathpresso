@@ -185,6 +185,78 @@ struct TestApp {
       TEST_INLINE(100.0),
       TEST_INLINE(1999.0),
 
+      TEST_INLINE(3.14),
+      TEST_INLINE(3.141),
+      TEST_INLINE(3.1415),
+      TEST_INLINE(3.14159),
+      TEST_INLINE(3.141592),
+      TEST_INLINE(3.1415926),
+      TEST_INLINE(3.14159265),
+      TEST_INLINE(3.141592653),
+      TEST_INLINE(3.1415926535),
+      TEST_INLINE(3.14159265358),
+      TEST_INLINE(3.141592653589),
+      TEST_INLINE(3.1415926535897),
+      TEST_INLINE(3.14159265358979),
+      TEST_INLINE(3.141592653589793),
+      TEST_INLINE(3.1415926535897932),
+      TEST_INLINE(3141592653589793.2),
+      TEST_INLINE(314159265358979.32),
+      TEST_INLINE(31415926535897.932),
+      TEST_INLINE(3141592653589.7932),
+      TEST_INLINE(314159265358.97932),
+      TEST_INLINE(31415926535.897932),
+      TEST_INLINE(3141592653.5897932),
+      TEST_INLINE(314159265.35897932),
+      TEST_INLINE(31415926.535897932),
+      TEST_INLINE(3141592.6535897932),
+      TEST_INLINE(314159.26535897932),
+      TEST_INLINE(31415.926535897932),
+      TEST_INLINE(3141.5926535897932),
+      TEST_INLINE(314.15926535897932),
+      TEST_INLINE(31.415926535897932),
+      TEST_INLINE(3.1415926535897932),
+
+      TEST_INLINE(1.2345),
+      TEST_INLINE(123.45e-2),
+
+      TEST_INLINE(12.345),
+      TEST_INLINE(123.45e-1),
+
+      TEST_INLINE(123.45),
+      TEST_INLINE(123.45e0),
+
+      TEST_INLINE(1234.5),
+      TEST_INLINE(123.45e1),
+
+      TEST_INLINE(12345),
+      TEST_INLINE(123.45e2),
+
+      TEST_INLINE(123450),
+      TEST_INLINE(123.45e3),
+
+      TEST_INLINE(1234500),
+      TEST_INLINE(123.45e4),
+
+      TEST_INLINE(12345000),
+      TEST_INLINE(123.45e5),
+
+      TEST_INLINE(1234500000),
+      TEST_INLINE(12345e5),
+      TEST_INLINE(12345e+5),
+      TEST_INLINE(12345.e+5),
+      TEST_INLINE(12345.0e+5),
+      TEST_INLINE(12345.0000e+5),
+
+      TEST_INLINE(0.12345),
+      TEST_INLINE(12345e-5),
+      TEST_INLINE(12345.e-5),
+      TEST_INLINE(12345.0e-5),
+      TEST_INLINE(12345.0000e-5),
+
+      TEST_INLINE(1.7976931348623157e+308),
+      TEST_INLINE(2.2250738585072014e-308),
+
       TEST_INLINE(x + y),
       TEST_INLINE(x - y),
       TEST_INLINE(x * y),
@@ -378,18 +450,18 @@ struct TestApp {
             arg[2] != test.xyz[2]) {
           printf("[Failure]: \"%s\" (%s)\n", exp, option.name);
 
-          static const char indentation[] = "          ";
-          if (result != test.result) printf("%s result(%f) != expected(%f)\n", indentation, result, test.result);
-          if (arg[0] != test.xyz[0]) printf("%s x(%f) != expected(%f)\n", indentation, arg[0], test.xyz[0]);
-          if (arg[1] != test.xyz[1]) printf("%s y(%f) != expected(%f)\n", indentation, arg[1], test.xyz[1]);
-          if (arg[2] != test.xyz[2]) printf("%s z(%f) != expected(%f)\n", indentation, arg[2], test.xyz[2]);
+          static const char indentation[] = "  ";
+          if (result != test.result) printf("%s _(%.17g) != expected(%.17g)\n", indentation, result, test.result);
+          if (arg[0] != test.xyz[0]) printf("%s x(%.17g) != expected(%.17g)\n", indentation, arg[0], test.xyz[0]);
+          if (arg[1] != test.xyz[1]) printf("%s y(%.17g) != expected(%.17g)\n", indentation, arg[1], test.xyz[1]);
+          if (arg[2] != test.xyz[2]) printf("%s z(%.17g) != expected(%.17g)\n", indentation, arg[2], test.xyz[2]);
 
           allOk = false;
         }
       }
 
       if (allOk)
-        printf("[Success]: \"%s\" -> %f\n", exp, test.result);
+        printf("[Success]: \"%s\" -> %.17g\n", exp, test.result);
       else
         failed = true;
     }
