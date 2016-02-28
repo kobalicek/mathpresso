@@ -12,7 +12,7 @@
 #include <math.h>
 
 #if defined(min)
- #undef min
+# undef min
 #endif // min
 
 #if defined(max)

@@ -118,44 +118,16 @@ static const uint8_t mpCharClass[] = {
 static MATHPRESSO_INLINE uint32_t mpGetLower(uint32_t c) { return c | 0x20; }
 
 //! \internal
-enum { kSafeDigits = 15 };
-
-//! \internal
-static const double mpDoublePow10Table[] = {
-  1e-0 , 1e-1 , 1e-2 , 1e-3 , 1e-4 , 1e-5 , 1e-6 , 1e-7 ,
-  1e-8 , 1e-9 , 1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15,
-  1e-16, 1e-17, 1e-18, 1e-19
+static const double mpPow10Table[] = {
+  1e+0 , 1e+1 , 1e+2 , 1e+3 , 1e+4 , 1e+5 , 1e+6 , 1e+7 ,
+  1e+8 , 1e+9 , 1e+10, 1e+11, 1e+12, 1e+13, 1e+14, 1e+15
 };
 
 //! \internal
-static const uint64_t mpUInt64Pow10Table[] = {
-  MATHPRESSO_UINT64_C(1),
-  MATHPRESSO_UINT64_C(10), 
-  MATHPRESSO_UINT64_C(100),
-  MATHPRESSO_UINT64_C(1000),
-  MATHPRESSO_UINT64_C(10000),
-  MATHPRESSO_UINT64_C(100000),
-  MATHPRESSO_UINT64_C(1000000),
-  MATHPRESSO_UINT64_C(10000000),
-  MATHPRESSO_UINT64_C(100000000),
-  MATHPRESSO_UINT64_C(1000000000),
-  MATHPRESSO_UINT64_C(10000000000),
-  MATHPRESSO_UINT64_C(100000000000),
-  MATHPRESSO_UINT64_C(1000000000000),
-  MATHPRESSO_UINT64_C(10000000000000),
-  MATHPRESSO_UINT64_C(100000000000000),
-  MATHPRESSO_UINT64_C(1000000000000000),
-  MATHPRESSO_UINT64_C(10000000000000000),
-  MATHPRESSO_UINT64_C(100000000000000000),
-  MATHPRESSO_UINT64_C(1000000000000000000),
-  MATHPRESSO_UINT64_C(10000000000000000000)
-  // Maximum value:   18446744073709551615
+enum {
+  kSafeDigits = 15,
+  kPow10TableSize = static_cast<int>(MATHPRESSO_ARRAY_SIZE(mpPow10Table))
 };
-
-//! \internal
-static MATHPRESSO_INLINE double mpSafeUInt64ToDouble(uint64_t x) {
-  return static_cast<double>(static_cast<int64_t>(x));
-}
 
 #define CHAR4X(C0, C1, C2, C3) \
   ( (static_cast<uint32_t>(C0)      ) + \
@@ -226,29 +198,38 @@ _Repeat:
     // Parsing floating point is not that simple as it looks. To simplify the
     // most common cases we parse floating points up to `kSafeDigits` and then
     // use libc `strtod()` function to parse numbers that are more complicated.
+    //
+    // http://www.exploringbinary.com/fast-path-decimal-to-floating-point-conversion/
+    double val = 0.0;
+    size_t digits = 0;
 
-    // Values have to be unsigned to allow overflow.
-    uint64_t dVal = 0;
-    uint64_t fVal = 0;
-    uint32_t eVal = 0;
+    // Skip leading zeros.
+    while (p[0] == '0') {
+      if (++p == pEnd)
+        break;
+    }
 
-    size_t dLen = 0;
-    size_t fLen = 0;
-    size_t eLen = 0;
-
-    // Parse a decimal part.
-    do {
+    // Parse significand.
+    size_t scale = 0;
+    while (p != pEnd) {
       c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
       if (c > 9)
         break;
+      scale++;
 
-      dVal = dVal * 10 + c;
-      dLen += dVal != 0; // Don't count leading zeros.
-    } while (++p != pEnd);
+      if (c != 0) {
+        if (scale < kPow10TableSize)
+          val = val * mpPow10Table[scale] + static_cast<double>(static_cast<int>(c));
+        digits += scale;
+        scale = 0;
+      }
 
-    // Parse a fractional part.
+      p++;
+    }
+    size_t significantDigits = digits + scale;
+
+    // Parse fraction.
     if (p != pEnd && p[0] == '.') {
-      // Counts the number of trailing zeros.
       size_t scale = 0;
 
       while (++p != pEnd) {
@@ -258,23 +239,24 @@ _Repeat:
         scale++;
 
         if (c != 0) {
-          if (scale < MATHPRESSO_ARRAY_SIZE(mpUInt64Pow10Table))
-            fVal = fVal * mpUInt64Pow10Table[scale] + c;
-          fLen += scale;
+          if (scale < kPow10TableSize)
+            val = val * mpPow10Table[scale] + static_cast<double>(static_cast<int>(c));
+          digits += scale;
           scale = 0;
         }
       }
 
-      // Token is a dot '.'.
+      // Token is '.'.
       if ((size_t)(p - pToken) == 1) {
         _p = reinterpret_cast<const char*>(p);
         return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenDot);
       }
     }
 
-    // Parse an exponential part.
-    size_t xLen = dLen + fLen;
+    bool safe = digits <= kSafeDigits && significantDigits < 999999;
+    int exponent = safe ? static_cast<int>(significantDigits) - static_cast<int>(digits) : 0;
 
+    // Parse an optional exponent.
     if (p != pEnd && mpGetLower(p[0]) == 'e') {
       if (++p == pEnd)
         goto _Invalid;
@@ -285,12 +267,15 @@ _Repeat:
         if (++p == pEnd)
           goto _Invalid;
 
+      uint32_t e = 0;
+      size_t eLen = 0;
+
       do {
         c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
         if (c > 9)
           break;
 
-        eVal = eVal * 10 + c;
+        e = e * 10 + c;
         eLen++;
       } while (++p != pEnd);
 
@@ -298,84 +283,35 @@ _Repeat:
       if (eLen == 0)
         goto _Invalid;
 
-      // If less than 10 digits it's safe to assumt the exponent is zero if
-      // `eVal` is zero. Otherwise it could have overflown (32-bit uint).
-      if (eVal == 0 && eLen < 10)
-        eLen = 0;
+      // If less than 10 digits it's safe to assume the exponent is zero if
+      // `e` is zero. Otherwise it could have overflown the 32-bit integer.
+      if (e == 0 && eLen < 10)
+        eLen = 0; // No exponent.
 
-      // If the exponent keeps the number within a safe boundary it can be
-      // just scaled here instead of bailing out to C's `strtod()`.
-      if (eLen < 2 && xLen <= kSafeDigits && eVal != 0) {
-        int decPt = static_cast<int>(dLen);
-        int digits = static_cast<int>(xLen);
-
-        decPt += !negative ? static_cast<int>(eVal) : -static_cast<int>(eVal);
-        digits = decPt < 0 ? digits - decPt : mpMax<int>(digits, decPt);
-
-        // The number of digits after the exponent is applied should be less
-        // than a maximum number of safe digits.
-        if (digits <= kSafeDigits) {
-          // First compose the `dVal` and `fVal` parts and then decompose them
-          // back depending on where the exponent has moved he decimal point.
-          MATHPRESSO_ASSERT(fLen < MATHPRESSO_ARRAY_SIZE(mpUInt64Pow10Table));
-          uint64_t composed = dVal * mpUInt64Pow10Table[fLen] + fVal;
-
-          if (decPt <= 0) {
-            // Decimal point has moved to the left leaving the decimal part
-            // zero. This is easy as increasing `fLen` will simply scale the
-            // resulting number.
-            dVal = 0;
-            fVal = composed;
-
-            dLen = 0;
-            fLen = static_cast<unsigned int>(digits);
-          }
-          else if (static_cast<unsigned int>(decPt) >= xLen) {
-            // Decimal point has moved to the right leaving the fractional
-            // part zero. This is also easy as we just need to scale the
-            // `composed` value and clear the fractional part.
-            dVal = composed * mpUInt64Pow10Table[static_cast<unsigned int>(decPt) - xLen];
-            dLen = static_cast<unsigned int>(digits);
-
-            fVal = 0;
-            fLen = 0;
-          }
-          else {
-            MATHPRESSO_ASSERT(digits - decPt < MATHPRESSO_ARRAY_SIZE(mpUInt64Pow10Table));
-            uint64_t denom = mpUInt64Pow10Table[digits - decPt];
-
-            dVal = composed / denom;
-            fVal = composed % denom;
-
-            dLen = static_cast<unsigned int>(decPt);
-            fLen = static_cast<unsigned int>(digits - decPt);
-          }
-
-          eVal = 0;
-          eLen = 0;
-          xLen = static_cast<unsigned int>(digits);
-        }
-      }
+      if (eLen <= 6)
+        exponent += negative ? -static_cast<int>(e) : static_cast<int>(e);
+      else
+        safe = false;
     }
 
     // Error if there is an alpha-numeric character right next to the number.
     if (p != pEnd && mpCharClass[p[0]] <= kTokenCharSym)
       goto _Invalid;
 
-    double val;
+    // Limit a range of safe values from Xe-15 to Xe15.
+    safe = safe && exponent >= -kPow10TableSize && exponent <= kPow10TableSize;
     size_t len = (size_t)(p - pToken);
 
-    if (xLen <= kSafeDigits && eLen == 0) {
-      val = mpSafeUInt64ToDouble(dVal);
-      if (fLen != 0)
-        val += mpSafeUInt64ToDouble(fVal) * mpDoublePow10Table[fLen];
+    if (safe) {
+      if (exponent != 0)
+        val = exponent < 0 ? val / mpPow10Table[-exponent] : val * mpPow10Table[exponent];
     }
     else {
       // Using libc's strtod is not optimal, but it's precise for complex cases.
       char tmp[512];
       char* buf = tmp;
 
-      if (len >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(len))) == NULL)
+      if (len >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(len + 1))) == NULL)
         return kTokenInvalid;
 
       memcpy(buf, pToken, len);
