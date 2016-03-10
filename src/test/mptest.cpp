@@ -26,42 +26,6 @@ inline void set_x87_mode(unsigned short mode) {
 #endif
 
 // ============================================================================
-// [Double]
-// ============================================================================
-
-// Wrapper for `double` so we can test % operator in our tests properly.
-struct Double {
-  inline Double(double val = 0) : val(val) {}
-  inline operator double() const { return val; }
-
-  inline Double& operator=(double x) { val = x; return *this; }
-  inline Double& operator=(const Double& x) { val = x.val; return *this; }
-
-  double val;
-};
-
-inline Double operator-(const Double& self) { return Double(-self.val); }
-inline Double operator!(const Double& self) { return Double(!self.val); }
-
-inline Double operator+(const Double& x, double y) { return Double(x.val + y); }
-inline Double operator-(const Double& x, double y) { return Double(x.val - y); }
-inline Double operator*(const Double& x, double y) { return Double(x.val * y); }
-inline Double operator/(const Double& x, double y) { return Double(x.val / y); }
-inline Double operator%(const Double& x, double y) { return Double(fmod(x.val, y)); }
-
-inline Double operator+(double x, const Double& y) { return Double(x + y.val); }
-inline Double operator-(double x, const Double& y) { return Double(x - y.val); }
-inline Double operator*(double x, const Double& y) { return Double(x * y.val); }
-inline Double operator/(double x, const Double& y) { return Double(x / y.val); }
-inline Double operator%(double x, const Double& y) { return Double(fmod(x, y.val)); }
-
-inline Double operator+(const Double& x, const Double& y) { return Double(x.val + y.val); }
-inline Double operator-(const Double& x, const Double& y) { return Double(x.val - y.val); }
-inline Double operator*(const Double& x, const Double& y) { return Double(x.val * y.val); }
-inline Double operator/(const Double& x, const Double& y) { return Double(x.val / y.val); }
-inline Double operator%(const Double& x, const Double& y) { return Double(fmod(x.val, y.val)); }
-
-// ============================================================================
 // [TestOption]
 // ============================================================================
 
@@ -109,26 +73,24 @@ struct TestApp {
   // [Compatibility with the MathPresso Language]
   // --------------------------------------------------------------------------
 
-  typedef Double var;
-
   // Constants / Variables.
-  Double E, PI;
-  Double x, y, z, big;
+  double E, PI;
+  double x, y, z, big;
 
   // Functions.
-  inline Double avg(double x, double y) { return Double((x + y) * 0.5); }
-  inline Double min(double x, double y) { return Double(x < y ? x : y); }
-  inline Double max(double x, double y) { return Double(x > y ? x : y); }
+  inline double avg(double x, double y) { return (x + y) * 0.5; }
+  inline double min(double x, double y) { return x < y ? x : y; }
+  inline double max(double x, double y) { return x > y ? x : y; }
 
-  inline Double abs(double x) { return Double(x < 0.0 ? -x : x); }
-  inline Double recip(double x) { return Double(1.0 / x); }
+  inline double abs(double x) { return x < 0.0 ? -x : x; }
+  inline double recip(double x) { return 1.0 / x; }
 
-  inline Double frac(double x) { return Double(x - ::floor(x)); }
-  inline Double round(double x) {
+  inline double frac(double x) { return x - ::floor(x); }
+  inline double round(double x) {
     double y = ::floor(x);
-    return Double(y + (x - y >= 0.5 ? double(1.0) : double(0.0)));
+    return y + (x - y >= 0.5 ? double(1.0) : double(0.0));
   }
-  inline Double roundeven(double x) { return Double(::rint(x)); }
+  inline double roundeven(double x) { return ::rint(x); }
 
   // --------------------------------------------------------------------------
   // [TestApp]
@@ -271,21 +233,23 @@ struct TestApp {
       TEST_INLINE(-x * -y),
       TEST_INLINE(-x / -y),
 
-      TEST_INLINE(x % y),
-      TEST_INLINE(z % y),
-      TEST_INLINE(x % -y),
-      TEST_INLINE(z % -y),
-      TEST_INLINE(-x % y),
-      TEST_INLINE(-z % y),
-      TEST_INLINE(-x % -y),
-      TEST_INLINE(-z % -y),
+      TEST_STRING(" x %  y", ::fmod( x, y)),
+      TEST_STRING(" z %  y", ::fmod( z, y)),
+      TEST_STRING(" x % -y", ::fmod( x,-y)),
+      TEST_STRING(" z % -y", ::fmod( z,-y)),
+      TEST_STRING("-x %  y", ::fmod(-x, y)),
+      TEST_STRING("-z %  y", ::fmod(-z, y)),
+      TEST_STRING("-x % -y", ::fmod(-x,-y)),
+      TEST_STRING("-z % -y", ::fmod(-z,-y)),
 
       TEST_INLINE(-(x + y)),
       TEST_INLINE(-(x - y)),
       TEST_INLINE(-(x * y)),
       TEST_INLINE(-(x / y)),
-      TEST_INLINE(-(x % y)),
 
+      TEST_STRING("-(x % y)", -(::fmod(x, y))),
+
+#if 0 // Temporarily disabled as it hangs VS, I don't know why.
       TEST_INLINE(x * z + y * z),
       TEST_INLINE(x * z - y * z),
       TEST_INLINE(x * z * y * z),
@@ -301,6 +265,7 @@ struct TestApp {
       TEST_INLINE(x + y == y - z),
       TEST_INLINE(x * y == y * z),
       TEST_INLINE(x > y == y < z),
+#endif
 
       TEST_INLINE(-x),
       TEST_INLINE(-1.0 + x),
@@ -388,9 +353,9 @@ struct TestApp {
       TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; a", y),
       TEST_STRING("var a=x, b=y; var t=a; a=b; b=t; b", x),
 
-      TEST_STRING("var a=x; a=a*a*a; a", x * x * x),
-      TEST_STRING("var a=x; a=a*a*a*a; a", x * x * x * x),
-      TEST_STRING("var a=x+1; a=a*a*a; a", (x+1.0) * (x+1.0) * (x+1.0)),
+      TEST_STRING("var a=x  ; a=a*a*a  ; a", x * x * x),
+      TEST_STRING("var a=x  ; a=a*a*a*a; a", x * x * x * x),
+      TEST_STRING("var a=x+1; a=a*a*a  ; a", (x+1.0) * (x+1.0) * (x+1.0)),
       TEST_STRING("var a=x+1; a=a*a*a*a; a", (x+1.0) * (x+1.0) * (x+1.0) * (x+1.0)),
 
       TEST_OUTPUT("x = 11; y = 22; z = 33"   , 33.0, 11.0, 22.0, 33.0),

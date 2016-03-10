@@ -411,13 +411,9 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
     case kOpTrunc:
     case kOpFloor:
     case kOpCeil: {
-      if (enableSSE4_1 || op != kOpRound) {
-        var = writableVar(var);
-        inlineRound(var.getXmm(), var.getXmm(), op);
-        return var;
-      }
-
-      break;
+      var = writableVar(var);
+      inlineRound(var.getXmm(), var.getXmm(), op);
+      return var;
     }
 
     case kOpAbs: {
@@ -654,12 +650,13 @@ void JitCompiler::inlineRound(const X86XmmVar& dst, const X86XmmVar& src, uint32
 
   // Pure SSE2 requires the following rounding trick:
   //   double roundeven(double x) {
-  //     double maxn  = pow(2, 52);
-  //     double magic = pow(2, 52) + pow(2, 51);
-  //     return x >= maxn ? x : x + magic - magic;
+  //     double maxn   = pow(2, 52);
+  //     double magic0 = pow(2, 52) + pow(2, 51);
+  //     return x >= maxn ? x : x + magic0 - magic0;
   //   }
   const double maxn = 4503599627370496.0;
-  const double magic = 6755399441055744.0;
+  const double magic0 = 6755399441055744.0;
+  const double magic1 = 6755399441055745.0;
 
   if (op == kOpRoundEven) {
     X86XmmVar t1 = c->newXmmSd();
@@ -668,9 +665,9 @@ void JitCompiler::inlineRound(const X86XmmVar& dst, const X86XmmVar& src, uint32
     c->movsd(t1, src);
     c->movsd(t2, src);
 
-    c->addsd(t1, getConstantD64(magic).getMem());
+    c->addsd(t1, getConstantD64(magic0).getMem());
     c->cmpsd(t2, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
-    c->subsd(t1, getConstantD64(magic).getMem());
+    c->subsd(t1, getConstantD64(magic0).getMem());
 
     // Combine the result.
     if (dst.getId() != src.getId())
@@ -685,7 +682,7 @@ void JitCompiler::inlineRound(const X86XmmVar& dst, const X86XmmVar& src, uint32
 
   // The `roundeven()` function can be used to implement efficiently the
   // remaining rounding functions. The easiest are `floor()` and `ceil()`.
-  if (op == kOpFloor || op == kOpCeil) {
+  if (op == kOpRound || op == kOpFloor || op == kOpCeil) {
     X86XmmVar t1 = c->newXmmSd();
     X86XmmVar t2 = c->newXmmSd();
     X86XmmVar t3 = c->newXmmSd();
@@ -696,31 +693,48 @@ void JitCompiler::inlineRound(const X86XmmVar& dst, const X86XmmVar& src, uint32
     if (dst.getId() != src.getId())
       c->movsd(dst, src);
 
-    if (op == kOpFloor) {
-      c->addsd(t2, getConstantD64(magic).getMem());
-      c->movsd(t1, src);
+    switch (op) {
+      case kOpRound:
+        c->addsd(t2, getConstantD64(magic0).getMem());
+        c->addsd(t3, getConstantD64(magic1).getMem());
 
-      c->subsd(t2, getConstantD64(magic).getMem());
-      c->cmpsd(t1, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
+        c->movsd(t1, src);
+        c->subsd(t2, getConstantD64(magic0).getMem());
+        c->subsd(t3, getConstantD64(magic1).getMem());
 
-      c->cmpsd(t3, t2, int(asmjit::kX86CmpLT));
-      c->andpd(t3, getConstantD64AsPD(1.0).getMem());
+        c->cmpsd(t1, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
+        c->maxsd(t2, t3);
 
-      c->andpd(dst, t1);
-      c->subpd(t2, t3);
-    }
-    else {
-      c->addsd(t2, getConstantD64(magic).getMem());
-      c->movsd(t1, src);
+        c->andpd(dst, t1);
+        break;
 
-      c->subsd(t2, getConstantD64(magic).getMem());
-      c->cmpsd(t1, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
+      case kOpFloor:
+        c->addsd(t2, getConstantD64(magic0).getMem());
+        c->movsd(t1, src);
 
-      c->cmpsd(t3, t2, int(asmjit::kX86CmpNLE));
-      c->andpd(t3, getConstantD64AsPD(1.0).getMem());
+        c->subsd(t2, getConstantD64(magic0).getMem());
+        c->cmpsd(t1, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
 
-      c->andpd(dst, t1);
-      c->addpd(t2, t3);
+        c->cmpsd(t3, t2, int(asmjit::kX86CmpLT));
+        c->andpd(t3, getConstantD64AsPD(1.0).getMem());
+
+        c->andpd(dst, t1);
+        c->subpd(t2, t3);
+        break;
+
+      case kOpCeil:
+        c->addsd(t2, getConstantD64(magic0).getMem());
+        c->movsd(t1, src);
+
+        c->subsd(t2, getConstantD64(magic0).getMem());
+        c->cmpsd(t1, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
+
+        c->cmpsd(t3, t2, int(asmjit::kX86CmpNLE));
+        c->andpd(t3, getConstantD64AsPD(1.0).getMem());
+
+        c->andpd(dst, t1);
+        c->addpd(t2, t3);
+        break;
     }
 
     c->andnpd(t1, t2);
@@ -741,10 +755,10 @@ void JitCompiler::inlineRound(const X86XmmVar& dst, const X86XmmVar& src, uint32
       c->movsd(dst, src);
 
     c->movsd(t1, t2);
-    c->addsd(t2, getConstantD64(magic).getMem());
+    c->addsd(t2, getConstantD64(magic0).getMem());
     c->movsd(t3, t1);
 
-    c->subsd(t2, getConstantD64(magic).getMem());
+    c->subsd(t2, getConstantD64(magic0).getMem());
     c->cmpsd(t1, getConstantD64(maxn).getMem(), int(asmjit::kX86CmpNLT));
 
     c->cmpsd(t3, t2, int(asmjit::kX86CmpLT));
