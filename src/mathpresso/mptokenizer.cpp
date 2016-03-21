@@ -363,11 +363,7 @@ _Repeat:
   // --------------------------------------------------------------------------
 
   else if (c < kTokenCharSpc) {
-    p++;
-    uint32_t c1 = 0;
-
-    if (p != pEnd)
-      c1 = static_cast<uint8_t>(p[0]);
+    uint32_t c1 = (++p != pEnd) ? static_cast<uint32_t>(p[0]) : static_cast<uint32_t>(0);
 
     switch (c) {
       case kTokenCharAdd: // `+=`, `++`, `+`.

@@ -30,9 +30,12 @@ namespace mathpresso {
 // on the C-language standard, but also adjusted to support MATHPRESSO specific
 // operators and rules. However, the associativity and precedence should be
 // fully compatible with C.
-#define ROW(opType, altType, params, precision, assignment, intrinsic, flags, name) \
+#define ROW(opType, altType, params, precedence, assignment, intrinsic, flags, name) \
   { \
-    kOp##opType, kOp##altType, precision, 0, \
+    static_cast<uint8_t>(kOp##opType), \
+    static_cast<uint8_t>(kOp##altType), \
+    static_cast<uint8_t>(precedence), \
+    0, \
     static_cast<uint32_t>( \
       flags | (assignment != 0 ? kOpFlagAssign : 0) \
             | (params     == 1 ? kOpFlagUnary : \

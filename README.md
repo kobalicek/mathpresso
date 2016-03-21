@@ -3,7 +3,7 @@ MathPresso
 
 Mathematical Expression Parser And JIT Compiler.
 
-  * [Official Repository (kobalicek/mathpresso-ng)](https://github.com/kobalicek/mathpresso-ng)
+  * [Official Repository (kobalicek/mathpresso)](https://github.com/kobalicek/mathpresso)
   * [Zlib Licensed](http://www.opensource.org/licenses/zlib-license.php)
 
 Introduction
@@ -318,7 +318,7 @@ RESULT: -1885.514400
 Dependencies
 ------------
 
-AsmJit - 1.0 or later.
+  * AsmJit - 1.0 or later.
 
 Support
 -------

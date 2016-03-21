@@ -198,7 +198,7 @@ JitCompiler::JitCompiler(Allocator* allocator, asmjit::X86Compiler* c)
     functionBody(NULL),
     constPool(&c->_constAllocator) {
 
-  enableSSE4_1 = asmjit::X86CpuInfo::getHost()->hasFeature(asmjit::kX86CpuFeatureSSE4_1);
+  enableSSE4_1 = asmjit::CpuInfo::getHost().hasFeature(asmjit::CpuInfo::kX86FeatureSSE4_1);
 }
 JitCompiler::~JitCompiler() {}
 
@@ -819,7 +819,7 @@ JitVar JitCompiler::getConstantU64AsPD(uint64_t value) {
   prepareConstPool();
 
   size_t offset;
-  asmjit::Vec128 vec = asmjit::Vec128::fromSq(value, 0);
+  asmjit::Vec128 vec = asmjit::Vec128::fromSQ(value, 0);
   if (constPool.add(&vec, sizeof(asmjit::Vec128), offset) != asmjit::kErrorOk)
     return JitVar();
 
@@ -845,7 +845,7 @@ CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log
 
   bool debugAsm = log != NULL && (options & kOptionDebugAsm) != 0;
   if (debugAsm) {
-    logger.setOption(asmjit::kLoggerOptionBinaryForm, true);
+    logger.addOptions(asmjit::Logger::kOptionBinaryForm);
     a.setLogger(&logger);
   }
 
