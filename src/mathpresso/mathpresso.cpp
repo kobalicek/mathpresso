@@ -383,7 +383,7 @@ Error Context::addVariable(const char* name, int offset, unsigned int flags) {
   return kErrorOk;
 }
 
-Error Context::addFunction(const char* name, void* fn, uint32_t flags) {
+Error Context::addFunction(const char* name, void* fn, unsigned int flags) {
   ContextInternalImpl* d;
 
   MATHPRESSO_PROPAGATE(mpContextMutable(this, &d));
