@@ -144,8 +144,8 @@ struct TestApp {
     ctx.addVariable("z"  , 2 * sizeof(double));
     ctx.addVariable("big", 3 * sizeof(double));
 
-    ctx.addFunction("custom1", custom1, mathpresso::kFunctionArg1);
-    ctx.addFunction("custom2", custom2, mathpresso::kFunctionArg2);
+    ctx.addFunction("custom1", (void*)custom1, mathpresso::kFunctionArg1);
+    ctx.addFunction("custom2", (void*)custom2, mathpresso::kFunctionArg2);
 
 #define TEST_INLINE(exp) { #exp, (double)(exp), { x, y, z } }
 #define TEST_STRING(str, result) { str, result, { x, y, z } }
