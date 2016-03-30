@@ -349,7 +349,7 @@ Error Context::addBuiltIns(void) {
     if (sym != NULL) \
       return MATHPRESSO_TRACE_ERROR(kErrorSymbolAlreadyExists); \
     \
-    sym = d->_builder.newSymbol(StringRef(name, nlen), hVal, kAstSymbolVariable, kAstScopeGlobal); \
+    sym = d->_builder.newSymbol(StringRef(name, nlen), hVal, type, kAstScopeGlobal); \
     if (sym == NULL) \
       return MATHPRESSO_TRACE_ERROR(kErrorNoMemory); \
     d->_scope.putSymbol(sym); \

@@ -63,6 +63,13 @@ struct TestOutputLog : public mathpresso::OutputLog {
 };
 
 // ============================================================================
+// [TestFunc]
+// ============================================================================
+
+static double custom1(double x) { return x; }
+static double custom2(double x, double y) { return x + y; }
+
+// ============================================================================
 // [TestApp]
 // ============================================================================
 
@@ -136,6 +143,9 @@ struct TestApp {
     ctx.addVariable("y"  , 1 * sizeof(double));
     ctx.addVariable("z"  , 2 * sizeof(double));
     ctx.addVariable("big", 3 * sizeof(double));
+
+    ctx.addFunction("custom1", custom1, mathpresso::kFunctionArg1);
+    ctx.addFunction("custom2", custom2, mathpresso::kFunctionArg2);
 
 #define TEST_INLINE(exp) { #exp, (double)(exp), { x, y, z } }
 #define TEST_STRING(str, result) { str, result, { x, y, z } }
@@ -339,6 +349,9 @@ struct TestApp {
       TEST_INLINE(min(x, y)),
       TEST_INLINE(max(x, y)),
       TEST_INLINE(pow(x, y)),
+
+      TEST_INLINE(custom1(x)),
+      TEST_INLINE(custom2(x, y)),
 
       TEST_STRING("var a=1; a", 1.0),
       TEST_STRING("var a=199   * 2; a", 398),
