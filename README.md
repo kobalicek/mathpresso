@@ -83,8 +83,9 @@ MathPresso's expression is always created around a `mathpresso::Context`, which 
 
 ```c++
 #include <mathpresso/mathpresso.h>
+#include <stdio.h>
 
-int main(int argc, char* argv() {
+int main(int argc, char* argv[]) {
   mathpresso::Context ctx;
   mathpresso::Expression exp;
 
@@ -134,6 +135,7 @@ The example above should be self-explanatory. The next example does the same but
 
 ```c++
 #include <mathpresso/mathpresso.h>
+#include <stdio.h>
 
 struct Data {
   inline Data(double x, double y, double z)
@@ -142,7 +144,7 @@ struct Data {
   double x, y, z;
 };
 
-int main(int argc, char* argv() {
+int main(int argc, char* argv[]) {
   mathpresso::Context ctx;
   mathpresso::Expression exp;
 
