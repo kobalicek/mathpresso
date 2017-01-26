@@ -739,7 +739,7 @@ void JitCompiler::inlineRound(const X86Xmm& dst, const X86Xmm& src, uint32_t op)
     X86Xmm t2 = cc->newXmmSd();
     X86Xmm t3 = cc->newXmmSd();
 
-    cc->movsd(t2, getConstantU64(UINT64_C(0x7FFFFFFFFFFFFFFF)).getMem());
+    cc->movsd(t2, getConstantU64(ASMJIT_UINT64_C(0x7FFFFFFFFFFFFFFF)).getMem());
     cc->andpd(t2, src);
 
     if (dst.getId() != src.getId())
@@ -753,7 +753,7 @@ void JitCompiler::inlineRound(const X86Xmm& dst, const X86Xmm& src, uint32_t op)
     cc->cmpsd(t1, getConstantD64(maxn).getMem(), x86::kCmpNLT);
 
     cc->cmpsd(t3, t2, x86::kCmpLT);
-    cc->orpd(t1, getConstantU64AsPD(UINT64_C(0x8000000000000000)).getMem());
+    cc->orpd(t1, getConstantU64AsPD(ASMJIT_UINT64_C(0x8000000000000000)).getMem());
     cc->andpd(t3, getConstantD64AsPD(1.0).getMem());
 
     cc->andpd(dst, t1);
