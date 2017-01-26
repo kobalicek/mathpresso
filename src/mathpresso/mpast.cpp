@@ -51,8 +51,8 @@ static const AstNodeSize mpAstNodeSize[] = {
 // [mathpresso::AstBuilder - Construction / Destruction]
 // ============================================================================
 
-AstBuilder::AstBuilder(Allocator* allocator)
-  : _allocator(allocator),
+AstBuilder::AstBuilder(ZoneHeap* heap)
+  : _heap(heap),
     _rootScope(NULL),
     _programNode(NULL),
     _numSlots(0) {}
@@ -63,7 +63,7 @@ AstBuilder::~AstBuilder() {}
 // ============================================================================
 
 AstScope* AstBuilder::newScope(AstScope* parent, uint32_t scopeType) {
-  void* p = _allocator->alloc(sizeof(AstScope));
+  void* p = _heap->alloc(sizeof(AstScope));
   if (p == NULL)
     return NULL;
   return new(p) AstScope(this, parent, scopeType);
@@ -71,12 +71,12 @@ AstScope* AstBuilder::newScope(AstScope* parent, uint32_t scopeType) {
 
 void AstBuilder::deleteScope(AstScope* scope) {
   scope->~AstScope();
-  _allocator->release(scope, sizeof(AstScope));
+  _heap->release(scope, sizeof(AstScope));
 }
 
 AstSymbol* AstBuilder::newSymbol(const StringRef& key, uint32_t hVal, uint32_t symbolType, uint32_t scopeType) {
   size_t kLen = key.getLength();
-  void* p = _allocator->alloc(sizeof(AstSymbol) + kLen + 1);
+  void* p = _heap->alloc(sizeof(AstSymbol) + kLen + 1);
 
   if (p == NULL)
     return NULL;
@@ -119,7 +119,7 @@ AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
 void AstBuilder::deleteSymbol(AstSymbol* symbol) {
   size_t kLen = symbol->getLength();
   symbol->~AstSymbol();
-  _allocator->release(symbol, sizeof(AstSymbol) + kLen + 1);
+  _heap->release(symbol, sizeof(AstSymbol) + kLen + 1);
 }
 
 void AstBuilder::deleteNode(AstNode* node) {
@@ -146,7 +146,7 @@ void AstBuilder::deleteNode(AstNode* node) {
       deleteNode(child);
   }
 
-  _allocator->release(node, mpAstNodeSize[nodeType].getNodeSize());
+  _heap->release(node, mpAstNodeSize[nodeType].getNodeSize());
 }
 
 // ============================================================================
@@ -189,7 +189,7 @@ struct AstScopeReleaseHandler {
 AstScope::AstScope(AstBuilder* ast, AstScope* parent, uint32_t scopeType)
   : _ast(ast),
     _parent(parent),
-    _symbols(ast->getAllocator()),
+    _symbols(ast->getHeap()),
     _scopeType(static_cast<uint8_t>(scopeType)) {}
 
 AstScope::~AstScope() {
@@ -324,10 +324,10 @@ static Error mpBlockNodeGrow(AstBlock* self) {
   else
     newCapacity += 256;
 
-  Allocator* allocator = self->getAst()->getAllocator();
+  ZoneHeap* heap = self->getAst()->getHeap();
 
   AstNode** oldArray = self->getChildren();
-  AstNode** newArray = static_cast<AstNode**>(allocator->alloc(newCapacity * sizeof(AstNode), newCapacity));
+  AstNode** newArray = static_cast<AstNode**>(heap->alloc(newCapacity * sizeof(AstNode), newCapacity));
 
   MATHPRESSO_NULLCHECK(newArray);
   newCapacity /= sizeof(AstNode*);
@@ -337,7 +337,7 @@ static Error mpBlockNodeGrow(AstBlock* self) {
 
   if (oldCapacity != 0) {
     ::memcpy(newArray, oldArray, length * sizeof(AstNode*));
-    allocator->release(oldArray, oldCapacity * sizeof(AstNode*));
+    heap->release(oldArray, oldCapacity * sizeof(AstNode*));
   }
 
   return kErrorOk;
@@ -499,7 +499,7 @@ Error AstDump::info(const char* fmt, ...) {
   va_start(ap, fmt);
 
   _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
-  _sb.appendVFormat(fmt, ap);
+  _sb.appendFormatVA(fmt, ap);
   _sb.appendChar('\n');
 
   va_end(ap);
@@ -511,7 +511,7 @@ Error AstDump::nest(const char* fmt, ...) {
   va_start(ap, fmt);
 
   _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
-  _sb.appendVFormat(fmt, ap);
+  _sb.appendFormatVA(fmt, ap);
   _sb.appendChar('\n');
 
   va_end(ap);

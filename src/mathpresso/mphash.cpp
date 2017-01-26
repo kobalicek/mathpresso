@@ -55,11 +55,11 @@ uint32_t HashUtils::closestPrime(uint32_t x) {
 // ============================================================================
 
 void HashBase::_rehash(uint32_t newCount) {
-  Allocator* allocator = _allocator;
+  ZoneHeap* heap = _heap;
 
   HashNode** oldData = _data;
   HashNode** newData = static_cast<HashNode**>(
-    allocator->allocZeroed(
+    heap->allocZeroed(
       static_cast<size_t>(newCount + kExtraCount) * sizeof(void*)));
 
   if (newData == NULL)
@@ -93,7 +93,7 @@ void HashBase::_rehash(uint32_t newCount) {
 
   _data = newData;
   if (oldData != _embedded)
-    allocator->release(oldData,
+    heap->release(oldData,
       static_cast<size_t>(oldCount + kExtraCount) * sizeof(void*));
 }
 

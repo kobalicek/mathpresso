@@ -151,14 +151,16 @@ static const ContextImpl mpContextNull = { 0 };
 //! Internal context data.
 struct ContextInternalImpl : public ContextImpl {
   MATHPRESSO_INLINE ContextInternalImpl()
-    : _allocator(),
-      _builder(&_allocator),
+    : _zone(32768 - Zone::kZoneOverhead),
+      _heap(&_zone),
+      _builder(&_heap),
       _scope(&_builder, static_cast<AstScope*>(NULL), kAstScopeGlobal) {
     mpAtomicSet(&_refCount, 1);
   }
   MATHPRESSO_INLINE ~ContextInternalImpl() {}
 
-  Allocator _allocator;
+  Zone _zone;
+  ZoneHeap _heap;
   AstBuilder _builder;
   AstScope _scope;
 };
@@ -432,11 +434,12 @@ Error Expression::compile(const Context& ctx, const char* body, unsigned int opt
   else
     options &= ~(kOptionVerbose | kOptionDebugAst | kOptionDebugAsm);
 
-  Allocator allocator;
+  Zone zone(32768 - Zone::kZoneOverhead);
+  ZoneHeap heap(&zone);
   StringBuilderTmp<512> sbTmp;
 
   // Initialize AST.
-  AstBuilder ast(&allocator);
+  AstBuilder ast(&heap);
   MATHPRESSO_PROPAGATE(ast.initProgramScope());
 
   ContextImpl* d = ctx._d;
@@ -538,7 +541,7 @@ void ErrorReporter::onWarning(uint32_t position, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
-    sb.appendVFormat(fmt, ap);
+    sb.appendFormatVA(fmt, ap);
 
     va_end(ap);
     onWarning(position, sb);
@@ -560,7 +563,7 @@ Error ErrorReporter::onError(Error error, uint32_t position, const char* fmt, ..
     va_list ap;
     va_start(ap, fmt);
 
-    sb.appendVFormat(fmt, ap);
+    sb.appendFormatVA(fmt, ap);
 
     va_end(ap);
     return onError(error, position, sb);

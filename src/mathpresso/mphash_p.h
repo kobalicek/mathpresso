@@ -9,7 +9,7 @@
 #define _MATHPRESSO_MPHASH_P_H
 
 // [Dependencies]
-#include "./mpallocator_p.h"
+#include "./mathpresso_p.h"
 
 namespace mathpresso {
 
@@ -71,8 +71,8 @@ struct HashBase {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE HashBase(Allocator* allocator) {
-    _allocator = allocator;
+  MATHPRESSO_INLINE HashBase(ZoneHeap* heap) {
+    _heap = heap;
     _length = 0;
 
     _bucketsCount = 1;
@@ -85,14 +85,14 @@ struct HashBase {
 
   MATHPRESSO_INLINE ~HashBase() {
     if (_data != _embedded)
-      _allocator->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
+      _heap->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
   }
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Allocator* getAllocator() const { return _allocator; }
+  MATHPRESSO_INLINE ZoneHeap* getHeap() const { return _heap; }
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -108,7 +108,7 @@ struct HashBase {
   // [Reset / Rehash]
   // --------------------------------------------------------------------------
 
-  Allocator* _allocator;
+  ZoneHeap* _heap;
 
   uint32_t _length;
   uint32_t _bucketsCount;
@@ -147,8 +147,8 @@ struct Hash : public HashBase {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Hash(Allocator* allocator)
-    : HashBase(allocator) {}
+  MATHPRESSO_INLINE Hash(ZoneHeap* heap)
+    : HashBase(heap) {}
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -170,7 +170,7 @@ struct Hash : public HashBase {
     }
 
     if (data != _embedded)
-      _allocator->release(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
+      _heap->release(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
 
     _bucketsCount = 1;
     _bucketsGrow = 1;
@@ -281,21 +281,21 @@ struct Map {
   };
 
   struct ReleaseHandler {
-    MATHPRESSO_INLINE ReleaseHandler(Allocator* allocator) : _allocator(allocator) {}
-    MATHPRESSO_INLINE void release(Node* node) { _allocator->release(node, sizeof(Node)); }
+    MATHPRESSO_INLINE ReleaseHandler(ZoneHeap* heap) : _heap(heap) {}
+    MATHPRESSO_INLINE void release(Node* node) { _heap->release(node, sizeof(Node)); }
 
-    Allocator* _allocator;
+    ZoneHeap* _heap;
   };
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Map(Allocator* allocator)
-    : _hash(allocator) {}
+  MATHPRESSO_INLINE Map(ZoneHeap* heap)
+    : _hash(heap) {}
 
   MATHPRESSO_INLINE ~Map() {
-    ReleaseHandler releaseHandler(_hash.getAllocator());
+    ReleaseHandler releaseHandler(_hash.getHeap());
     _hash.reset(releaseHandler);
   }
 
@@ -318,7 +318,7 @@ struct Map {
   }
 
   MATHPRESSO_INLINE Error put(const Key& key, const Value& value) {
-    Node* node = static_cast<Node*>(_hash._allocator->alloc(sizeof(Node)));
+    Node* node = static_cast<Node*>(_hash._heap->alloc(sizeof(Node)));
     if (node == NULL)
       return MATHPRESSO_TRACE_ERROR(kErrorNoMemory);
 

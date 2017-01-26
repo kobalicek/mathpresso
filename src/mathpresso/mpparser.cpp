@@ -409,7 +409,7 @@ _Repeat1:
         break;
       }
 
-      // Parse a right-to-left associative unary operator ('++', '--', '+', '-', "~", "!").
+      // Parse a right-to-left associative unary operator ('+', '-', "!").
       case kTokenAdd         : op = kOpNone  ; goto _Unary;
       case kTokenSub         : op = kOpNeg   ; goto _Unary;
       case kTokenNot         : op = kOpNot   ; goto _Unary;

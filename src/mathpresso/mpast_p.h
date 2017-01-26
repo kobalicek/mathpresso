@@ -9,7 +9,6 @@
 #define _MATHPRESSO_MPAST_P_H
 
 // [Dependencies]
-#include "./mpallocator_p.h"
 #include "./mphash_p.h"
 
 namespace mathpresso {
@@ -160,14 +159,14 @@ struct AstBuilder {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  AstBuilder(Allocator* allocator);
+  AstBuilder(ZoneHeap* heap);
   ~AstBuilder();
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Allocator* getAllocator() const { return _allocator; }
+  MATHPRESSO_INLINE ZoneHeap* getHeap() const { return _heap; }
 
   MATHPRESSO_INLINE AstScope* getRootScope() const { return _rootScope; }
   MATHPRESSO_INLINE AstProgram* getProgramNode() const { return _programNode; }
@@ -184,7 +183,7 @@ struct AstBuilder {
   void deleteSymbol(AstSymbol* symbol);
 
 #define MATHPRESSO_ALLOC_AST_OBJECT(_Size_) \
-  void* obj = _allocator->alloc(_Size_); \
+  void* obj = _heap->alloc(_Size_); \
   if (MATHPRESSO_UNLIKELY(obj == NULL)) return NULL
 
   template<typename T>
@@ -209,10 +208,6 @@ struct AstBuilder {
 
   void deleteNode(AstNode* node);
 
-  MATHPRESSO_INLINE char* newString(const char* s, size_t sLen) {
-    return _allocator->allocString(s, sLen);
-  }
-
   MATHPRESSO_INLINE uint32_t newSlotId() { return _numSlots++; }
 
   // --------------------------------------------------------------------------
@@ -231,8 +226,8 @@ struct AstBuilder {
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Allocator.
-  Allocator* _allocator;
+  //! Heap.
+  ZoneHeap* _heap;
   //! String builder to build possible output messages.
   StringBuilder _sb;
 
@@ -637,7 +632,7 @@ struct AstNode {
   uint8_t _nodeType;
   //! Node flags, see `AstNodeFlags`.
   uint8_t _nodeFlags;
-  //! Node size in bytes for `Allocator`.
+  //! Node size in bytes for `ZoneHeap`.
   uint8_t _nodeSize;
   //! Operator, see `OpType`.
   uint8_t _op;

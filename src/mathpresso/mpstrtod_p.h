@@ -11,7 +11,8 @@
 // [Dependencies]
 #include "./mathpresso_p.h"
 
-#if defined(_MSC_VER)
+// `mathpresso_p.h` includes asmjit, so we can use `ASMJIT_OS_...`.
+#if ASMJIT_OS_WINDOWS
 # define MATHPRESSO_STRTOD_MSLOCALE
 # include <locale.h>
 #else

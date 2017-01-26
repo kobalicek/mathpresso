@@ -7,7 +7,7 @@
 // This is a minimum working example that uses most of MathPresso features. It
 // shows how to compile and evaluate expressions and how to handle errors. It
 // also shows how to print the generated AST and machine code.
-#include "../mathpresso/mathpresso.h"
+#include "../src/mathpresso/mathpresso.h"
 
 #include <stdio.h>
 
@@ -56,9 +56,9 @@ int main(int argc, char* argv[]) {
   // Create the context, add builtins and define the `Data` layout.
   mathpresso::Context ctx;
   ctx.addBuiltIns();
-  ctx.addVariable("x"  , MATHPRESSO_OFFSET(Data, x));
-  ctx.addVariable("y"  , MATHPRESSO_OFFSET(Data, y));
-  ctx.addVariable("z"  , MATHPRESSO_OFFSET(Data, z));
+  ctx.addVariable("x", MATHPRESSO_OFFSET(Data, x));
+  ctx.addVariable("y", MATHPRESSO_OFFSET(Data, y));
+  ctx.addVariable("z", MATHPRESSO_OFFSET(Data, z));
 
   // The following options will cause that MathPresso will send everything
   // it does to `OutputLog`.

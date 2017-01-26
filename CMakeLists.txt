@@ -1,72 +1,34 @@
 cmake_minimum_required(VERSION 3.1)
 
+# Don't create a project if it was already created by another CMakeLists.txt.
+# This allows one library to embed another library without a project collision.
+if(NOT CMAKE_PROJECT_NAME OR "${CMAKE_PROJECT_NAME}" STREQUAL "mathpresso")
+  project(mathpresso C CXX)
+endif()
+
 # =============================================================================
 # [MathPresso - Configuration]
 # =============================================================================
 
-# Embedding mode, mathpresso will not create any targets (default FALSE).
-# set(MATHPRESSO_EMBED FALSE)
+set(MATHPRESSO_DIR         "${CMAKE_CURRENT_LIST_DIR}"   CACHE PATH "Location of 'mathpresso'")
+set(ASMJIT_DIR             "${MATHPRESSO_DIR}/../asmjit" CACHE PATH "Location of 'asmjit'")
 
-# Whether to build a static library (default FALSE).
-# set(MATHPRESSO_STATIC FALSE)
+set(MATHPRESSO_EMBED       FALSE               CACHE BOOLEAN "Embed 'mathpresso' library (no targets)")
+set(MATHPRESSO_STATIC      ${MATHPRESSO_EMBED} CACHE BOOLEAN "Build 'mathpresso' library as static")
+set(MATHPRESSO_BUILD_TEST  FALSE               CACHE BOOLEAN "Build 'mathpresso_test' applications")
 
-# Whether to build tests and samples (default FALSE).
-# set(MATHPRESSO_BUILD_TEST FALSE)
-
-# =============================================================================
-# [MathPresso - Build / Embed]
-# =============================================================================
-
-# Do not create a project if this CMakeLists.txt is included from another
-# project. This makes it easy to embed or create a static library.
-if(NOT CMAKE_PROJECT_NAME OR "${CMAKE_PROJECT_NAME}" MATCHES "^mathpresso$")
-  project(mathpresso C CXX)
-  set(MATHPRESSO_SIGNATURE "Standalone")
-else()
-  set(MATHPRESSO_SIGNATURE "Included")
+if(NOT DEFINED ASMJIT_EMBED)
+  set(ASMJIT_EMBED TRUE CACHE BOOLEAN "")
 endif()
 
-if(MATHPRESSO_EMBED)
-  set(MATHPRESSO_SIGNATURE "${MATHPRESSO_SIGNATURE} | Mode=Embed")
-  set(MATHPRESSO_STATIC TRUE) # Implies MATHPRESSO_STATIC.
-elseif(MATHPRESSO_STATIC)
-  set(MATHPRESSO_SIGNATURE "${MATHPRESSO_SIGNATURE} | Mode=Static")
-else()
-  set(MATHPRESSO_SIGNATURE "${MATHPRESSO_SIGNATURE} | Mode=Shared")
-endif()
-
-if(MATHPRESSO_BUILD_TEST)
-  set(MATHPRESSO_SIGNATURE "${MATHPRESSO_SIGNATURE} | Test=On")
-else()
-  set(MATHPRESSO_SIGNATURE "${MATHPRESSO_SIGNATURE} | Test=Off")
-endif()
-
-if(NOT MATHPRESSO_DIR)
-  set(MATHPRESSO_DIR ${CMAKE_CURRENT_LIST_DIR})
-endif()
-
-message("-- [mathpresso] ${MATHPRESSO_SIGNATURE}")
-message("-- [mathpresso] MATHPRESSO_DIR=${MATHPRESSO_DIR}")
-
 # =============================================================================
-# [MathPresso - Flags / Deps]
+# [MathPresso - Project]
 # =============================================================================
 
-set(MATHPRESSO_SOURCE_DIR "${MATHPRESSO_DIR}/src")    # MathPresso source directory.
-set(MATHPRESSO_INCLUDE_DIR "${MATHPRESSO_SOURCE_DIR}")# MathPresso include directory.
-
-set(MATHPRESSO_DEPS)                                  # MathPresso dependencies (list of libraries) for the linker.
-set(MATHPRESSO_LIBS)                                  # MathPresso dependencies with mathpresso included, for consumers.
-
-# Internal, never use.
-set(MATHPRESSO_D "-D")                                # Used to define a C/C++ preprocessor parameter (-D or /D).
-set(MATHPRESSO_PRIVATE_CFLAGS)                        # Compiler flags independent of build type.
-set(MATHPRESSO_PRIVATE_CFLAGS_REL)                    # Compiler flags used only by debug build.
-set(MATHPRESSO_PRIVATE_CFLAGS_DBG)                    # Compiler flags used only by release build.
+include("${MATHPRESSO_DIR}/CxxProject.cmake")
+cxx_project(mathpresso)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-  set(MATHPRESSO_D "/D")
-
   list(APPEND MATHPRESSO_PRIVATE_CFLAGS /GF)
   list(APPEND MATHPRESSO_PRIVATE_CFLAGS_DBG /GS /GR-)
   list(APPEND MATHPRESSO_PRIVATE_CFLAGS_REL /Oi /Oy /GS- /GR-)
@@ -77,27 +39,22 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(GNU|Clang)$")
-  list(APPEND MATHPRESSO_PRIVATE_CFLAGS -fno-exceptions)
+  cxx_detect_standard(MATHPRESSO_PRIVATE_CFLAGS)
+  cxx_detect_cflags(MATHPRESSO_PRIVATE_CFLAGS
+    "-fvisibility=hidden"
+    "-fno-exceptions"
+    "-fno-tree-vectorize"
+    "-Winconsistent-missing-override")
+  list(APPEND MATHPRESSO_PRIVATE_CFLAGS_REL -fmerge-all-constants)
 endif()
 
-if(MATHPRESSO_EMBED)
-  list(APPEND MATHPRESSO_PRIVATE_CFLAGS "${MATHPRESSO_D}MATHPRESSO_EMBED")
-elseif(MATHPRESSO_STATIC)
-  list(APPEND MATHPRESSO_PRIVATE_CFLAGS "${MATHPRESSO_D}MATHPRESSO_STATIC")
-endif()
-
-# Dependencies.
-if(NOT ASMJIT_DIR)
-  set(ASMJIT_DIR "${MATHPRESSO_DIR}/../asmjit")
-endif()
-set(ASMJIT_EMBED TRUE)
 include("${ASMJIT_DIR}/CMakeLists.txt")
 list(APPEND MATHPRESSO_DEPS ${ASMJIT_LIBS})
-list(APPEND MATHPRESSO_PRIVATE_CFLAGS "${MATHPRESSO_D}ASMJIT_EMBED")
+list(APPEND MATHPRESSO_PRIVATE_CFLAGS "${ASMJIT_CFLAGS}")
 
 # Use Unicode by default on Windows target.
 if(WIN32)
-  list(APPEND MATHPRESSO_PRIVATE_CFLAGS "${MATHPRESSO_D}_UNICODE")
+  list(APPEND MATHPRESSO_PRIVATE_CFLAGS "${CXX_DEFINE}_UNICODE")
 endif()
 
 set(MATHPRESSO_LIBS ${MATHPRESSO_DEPS})
@@ -105,63 +62,19 @@ if(NOT MATHPRESSO_EMBED)
   list(INSERT MATHPRESSO_LIBS 0 mathpresso)
 endif()
 
-message("-- [mathpresso] MATHPRESSO_DEPS=${MATHPRESSO_DEPS}")
-message("-- [mathpresso] MATHPRESSO_LIBS=${MATHPRESSO_LIBS}")
+list(REMOVE_DUPLICATES MATHPRESSO_DEPS)
+list(REMOVE_DUPLICATES MATHPRESSO_PRIVATE_CFLAGS)
 
-# =============================================================================
-# [MathPresso - Macros]
-# =============================================================================
-
-macro(mathpresso_add_source _out_dst _src_dir)
-  set(_src_path "${MATHPRESSO_SOURCE_DIR}/${_src_dir}")
-  set(_src_list)
-
-  foreach(_arg ${ARGN})
-    set(_src_file "${_src_path}/${_arg}")
-    list(APPEND _src_list ${_src_file})
-  endforeach()
-
-  list(APPEND "${_out_dst}" ${_src_list})
-  source_group(${_src_dir} FILES ${_src_list})
-endmacro()
-
-macro(mathpresso_add_library _target _src _deps _cflags _cflags_dbg _cflags_rel)
-  if(NOT MATHPRESSO_STATIC)
-    add_library(${_target} SHARED ${_src})
-  else()
-    add_library(${_target} STATIC ${_src})
-  endif()
-  target_link_libraries(${_target} ${_deps})
-
-  if(CMAKE_BUILD_TYPE)
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-      target_compile_options(${_target} PRIVATE ${_cflags} ${_cflags_dbg})
-    else()
-      target_compile_options(${_target} PRIVATE ${_cflags} ${_cflags_rel})
-    endif()
-  else()
-    target_compile_options(${_target} PRIVATE ${_cflags}
-      $<$<CONFIG:Debug>:${_cflags_dbg}>
-      $<$<NOT:$<CONFIG:Debug>>:${_cflags_rel}>)
-  endif()
-
-  if(NOT MATHPRESSO_STATIC)
-    install(TARGETS ${_target} DESTINATION "lib${LIB_SUFFIX}")
-  endif()
-endmacro()
+cxx_project_info(mathpresso)
 
 # =============================================================================
 # [MathPresso - Sources]
 # =============================================================================
 
-set(MATHPRESSO_SRC "")
-
-mathpresso_add_source(MATHPRESSO_SRC mathpresso
+cxx_add_source(mathpresso MATHPRESSO_SRC mathpresso
   mathpresso.cpp
   mathpresso.h
   mathpresso_p.h
-  mpallocator.cpp
-  mpallocator_p.h
   mpast.cpp
   mpast_p.h
   mpatomic_p.h
@@ -184,13 +97,14 @@ mathpresso_add_source(MATHPRESSO_SRC mathpresso
 # =============================================================================
 
 if(NOT MATHPRESSO_EMBED)
-  mathpresso_add_library(mathpresso
+  cxx_add_library(mathpresso
+    mathpresso
     "${MATHPRESSO_SRC};${ASMJIT_SRC}"
     "${MATHPRESSO_DEPS}"
     "${MATHPRESSO_PRIVATE_CFLAGS}"
     "${MATHPRESSO_PRIVATE_CFLAGS_REL}"
-    "${MATHPRESSO_PRIVATE_CFLAGS_DBG}"
-  )
+    "${MATHPRESSO_PRIVATE_CFLAGS_DBG}")
+  message("II=${ASMJIT_INCLUDE_DIR}")
   target_include_directories(mathpresso PRIVATE BEFORE ${ASMJIT_INCLUDE_DIR})
 
   foreach(i ${MATHPRESSO_SRC})
@@ -205,17 +119,8 @@ if(NOT MATHPRESSO_EMBED)
   endforeach()
 endif()
 
-# =============================================================================
-# [MathPresso - Test]
-# =============================================================================
-
 if(MATHPRESSO_BUILD_TEST)
-  add_executable(mpeval src/test/mpeval.cpp)
-  target_link_libraries(mpeval ${MATHPRESSO_LIBS})
-
-  add_executable(mptest src/test/mptest.cpp)
-  target_link_libraries(mptest ${MATHPRESSO_LIBS})
-
-  add_executable(mptutorial src/test/mptutorial.cpp)
-  target_link_libraries(mptutorial ${MATHPRESSO_LIBS})
+  cxx_add_executable(mathpresso mpeval     "test/mpeval.cpp"     "${MATHPRESSO_LIBS}" "${MATHPRESSO_CFLAGS}" "" "")
+  cxx_add_executable(mathpresso mptest     "test/mptest.cpp"     "${MATHPRESSO_LIBS}" "${MATHPRESSO_CFLAGS}" "" "")
+  cxx_add_executable(mathpresso mptutorial "test/mptutorial.cpp" "${MATHPRESSO_LIBS}" "${MATHPRESSO_CFLAGS}" "" "")
 endif()

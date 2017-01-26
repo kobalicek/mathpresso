@@ -4,7 +4,7 @@
 // [License]
 // Zlib - See LICENSE.md file in the package.
 
-#include "../mathpresso/mathpresso.h"
+#include "../src/mathpresso/mathpresso.h"
 
 #include <stdio.h>
 #include <stdlib.h>

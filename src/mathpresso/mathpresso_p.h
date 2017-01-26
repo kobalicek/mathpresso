@@ -14,10 +14,11 @@
 
 #include <stdarg.h>
 #include <math.h>
-#include <new>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <new>
 
 #if defined(_MSC_VER)
 #include <windows.h>
@@ -175,6 +176,18 @@ typedef unsigned __int64 uint64_t;
 namespace mathpresso {
 
 // ============================================================================
+// [Reuse]
+// ============================================================================
+
+// Reuse these classes - we depend on asmjit anyway and these are internal.
+using asmjit::StringBuilder;
+using asmjit::StringBuilderTmp;
+
+using asmjit::Zone;
+using asmjit::ZoneHeap;
+using asmjit::ZoneVector;
+
+// ============================================================================
 // [mathpresso::OpType]
 // ============================================================================
 
@@ -315,13 +328,6 @@ MATHPRESSO_NOAPI void mpAssertionFailure(const char* file, int line, const char*
 // ============================================================================
 
 MATHPRESSO_NOAPI Error mpTraceError(Error error);
-
-// ============================================================================
-// [mathpresso::StringBuilder]
-// ============================================================================
-
-using asmjit::StringBuilder;
-using asmjit::StringBuilderTmp;
 
 // ============================================================================
 // [mpsl::OpInfo]
