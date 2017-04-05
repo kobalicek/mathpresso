@@ -4,7 +4,7 @@ MathPresso
 Mathematical Expression Parser And JIT Compiler.
 
   * [Official Repository (kobalicek/mathpresso)](https://github.com/kobalicek/mathpresso)
-  * [Official Blog (asmbits)] (https://asmbits.blogspot.com/ncr)
+  * [Official Blog (asmbits)](https://asmbits.blogspot.com/ncr)
   * [Official Chat (gitter)](https://gitter.im/kobalicek/mpsl)
   * [Permissive ZLIB license](./LICENSE.md)
 
