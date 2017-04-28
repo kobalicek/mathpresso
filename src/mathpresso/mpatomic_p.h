@@ -39,7 +39,7 @@ static MATHPRESSO_INLINE uintptr_t mpAtomicInc(uintptr_t* atomic) {
 };
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicDec(uintptr_t* atomic) {
-  return _InterlockedDecrement64((__int64 volatile *)&atomic);
+  return _InterlockedDecrement64((__int64 volatile *)atomic);
 }
 # else
 //! \internal
