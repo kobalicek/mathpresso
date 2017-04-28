@@ -310,7 +310,7 @@ if (NOT __CXX_INCLUDED)
     endif()
 
     if(NOT ${PRODUCT}_STATIC)
-      install(TARGETS ${target} DESTINATION "lib${LIB_SUFFIX}")
+      #install(TARGETS ${target} DESTINATION "lib${LIB_SUFFIX}")
     endif()
   endfunction()
 
@@ -334,7 +334,7 @@ if (NOT __CXX_INCLUDED)
     endif()
 
     if(NOT ${PRODUCT}_STATIC)
-      install(TARGETS ${target} DESTINATION "lib${LIB_SUFFIX}")
+      #install(TARGETS ${target} DESTINATION "lib${LIB_SUFFIX}")
     endif()
   endfunction()
 endif()
