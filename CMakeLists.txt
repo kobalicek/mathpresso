@@ -1,10 +1,4 @@
 cmake_minimum_required(VERSION 3.1)
-include( BpcPackage.cmake )
-
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR NOT CMAKE_INSTALL_PREFIX)
-    set (CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}-install/" CACHE PATH "CMake install Directory" FORCE )
-endif()
-set(CMAKE_CONFIGURATION_TYPES Debug RelWithDebInfo CACHE TYPE INTERNAL FORCE )
 
 # Don't create a project if it was already created by another CMakeLists.txt.
 # This allows one library to embed another library without a project collision.
@@ -98,19 +92,6 @@ cxx_add_source(mathpresso MATHPRESSO_SRC mathpresso
   mptokenizer_p.h
 )
 
-set( MATHPRESSO_PUBLIC_HEADERS )
-
-foreach(i ${MATHPRESSO_SRC})
-    get_filename_component(path ${i} PATH)
-    get_filename_component(name ${i} NAME)
-    string(REGEX REPLACE "^${MATHPRESSO_SOURCE_DIR}/" "" targetpath "${path}")
-    if(${name} MATCHES ".h$")
-      if(NOT "${name}" MATCHES "_p.h$")
-        list( APPEND MATHPRESSO_PUBLIC_HEADERS ${i} )
-      endif()
-    endif()
-  endforeach()
-  
 # =============================================================================
 # [MathPresso - Targets]
 # =============================================================================
@@ -125,25 +106,19 @@ if(NOT MATHPRESSO_EMBED)
     "${MATHPRESSO_PRIVATE_CFLAGS_DBG}")
   message("II=${ASMJIT_INCLUDE_DIR}")
   target_include_directories(mathpresso PRIVATE BEFORE ${ASMJIT_INCLUDE_DIR})
-  target_include_directories(mathpresso PUBLIC
-	$<BUILD_INTERFACE:${MATHPRESSO_SOURCE_DIR}>
-	#$<INSTALL_INTERFACE:include>
-  )
+  target_include_directories(mathpresso PUBLIC ${MATHPRESSO_SOURCE_DIR})
   
-  set_property( TARGET mathpresso PROPERTY PUBLIC_HEADER ${MATHPRESSO_PUBLIC_HEADERS} )
   export(TARGETS mathpresso FILE mathpresso-targets.cmake)
-  BpcInstallPackage( NAME mathpresso VERSION "0.0.0" TARGETS mathpresso )
-  
-  # foreach(i ${MATHPRESSO_SRC})
-    # get_filename_component(path ${i} PATH)
-    # get_filename_component(name ${i} NAME)
-    # string(REGEX REPLACE "^${MATHPRESSO_SOURCE_DIR}/" "" targetpath "${path}")
-    # if(${name} MATCHES ".h$")
-      # if(NOT "${name}" MATCHES "_p.h$")
-        # install(FILES ${i} DESTINATION "include/${targetpath}")
-      # endif()
-    # endif()
-  # endforeach()
+  foreach(i ${MATHPRESSO_SRC})
+    get_filename_component(path ${i} PATH)
+    get_filename_component(name ${i} NAME)
+    string(REGEX REPLACE "^${MATHPRESSO_SOURCE_DIR}/" "" targetpath "${path}")
+    if(${name} MATCHES ".h$")
+      if(NOT "${name}" MATCHES "_p.h$")
+        install(FILES ${i} DESTINATION "include/${targetpath}")
+      endif()
+    endif()
+  endforeach()
 endif()
 
 if(MATHPRESSO_BUILD_TEST)
