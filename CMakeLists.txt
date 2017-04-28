@@ -106,9 +106,7 @@ if(NOT MATHPRESSO_EMBED)
     "${MATHPRESSO_PRIVATE_CFLAGS_DBG}")
   message("II=${ASMJIT_INCLUDE_DIR}")
   target_include_directories(mathpresso PRIVATE BEFORE ${ASMJIT_INCLUDE_DIR})
-  target_include_directories(mathpresso PUBLIC ${MATHPRESSO_SOURCE_DIR})
-  
-  export(TARGETS mathpresso FILE mathpresso-targets.cmake)
+
   foreach(i ${MATHPRESSO_SRC})
     get_filename_component(path ${i} PATH)
     get_filename_component(name ${i} NAME)
