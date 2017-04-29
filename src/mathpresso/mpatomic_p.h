@@ -39,7 +39,7 @@ static MATHPRESSO_INLINE uintptr_t mpAtomicInc(uintptr_t* atomic) {
 };
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicDec(uintptr_t* atomic) {
-  return _InterlockedDecrement64((__int64 volatile *)&atomic);
+  return _InterlockedDecrement64((__int64 volatile *)atomic);
 }
 # else
 //! \internal
@@ -62,11 +62,11 @@ static MATHPRESSO_INLINE uintptr_t mpAtomicSetXchg(uintptr_t* atomic, uintptr_t 
 };
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicInc(uintptr_t* atomic) {
-  return __sync_fetch_and_add(atomic, 1);
+  return __sync_add_and_fetch(atomic, 1);
 }
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicDec(uintptr_t* atomic) {
-  return __sync_fetch_and_sub(atomic, 1);
+  return __sync_sub_and_fetch(atomic, 1);
 }
 #endif // __GNUC__
 
