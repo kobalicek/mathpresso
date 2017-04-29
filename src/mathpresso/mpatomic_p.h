@@ -62,7 +62,7 @@ static MATHPRESSO_INLINE uintptr_t mpAtomicSetXchg(uintptr_t* atomic, uintptr_t 
 };
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicInc(uintptr_t* atomic) {
-  return __sync_fetch_and_add(atomic, 1);
+  return __sync_add_and_fetch(atomic, 1);
 }
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicDec(uintptr_t* atomic) {
