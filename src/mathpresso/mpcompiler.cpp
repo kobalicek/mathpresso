@@ -377,7 +377,7 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
     case kOpIsInf: {
       var = writableVar(var);
       cc->orpd(var.getXmm(), getConstantU64AsPD(MATHPRESSO_UINT64_C(0x8000000000000000)).getMem());
-      cc->cmpsd(var.getXmm(), getConstantU64(MATHPRESSO_UINT64_C(0xFF80000000000000)).getMem(), int(x86::kCmpEQ));
+      cc->cmpsd(var.getXmm(), getConstantU64(MATHPRESSO_UINT64_C(0xFFF0000000000000)).getMem(), int(x86::kCmpEQ));
       cc->andpd(var.getXmm(), getConstantD64AsPD(1.0).getMem());
       return var;
     }

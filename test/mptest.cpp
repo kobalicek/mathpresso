@@ -11,19 +11,67 @@
 #include <string.h>
 #include <math.h>
 
+#if defined(_MSC_VER) && (_MSC_VER < 1600)
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int64 uint64_t;
+# define MATHPRESSO_INT64_C(x) (x##i64)
+# define MATHPRESSO_UINT64_C(x) (x##ui64)
+#else
+# include <stdint.h>
+# define MATHPRESSO_INT64_C(x) (x##ll)
+# define MATHPRESSO_UINT64_C(x) (x##ull)
+#endif
+
+// Undef all macros that could collide with mathpresso language builtins (see tests).
 #if defined(min)
 # undef min
-#endif // min
+#endif
 
 #if defined(max)
 # undef max
-#endif // max
+#endif
+
+#if defined(isnan)
+# undef isnan
+#endif
+
+#if defined(isinf)
+# undef isinf
+#endif
+
+#if defined(isfinite)
+# undef isfinite
+#endif
 
 #if defined(__GNUC__) || defined(__clang__)
 inline void set_x87_mode(unsigned short mode) {
   __asm__ __volatile__ ("fldcw %0" :: "m" (*&mode));
 }
 #endif
+
+// ============================================================================
+// [DoubleBits]
+// ============================================================================
+
+// This is a copy-pase from `mpeval_p.h`, we can't include it here since it's
+// private.
+union DoubleBits {
+  static MATHPRESSO_INLINE DoubleBits fromDouble(double val) { DoubleBits u; u.d = val; return u; }
+  static MATHPRESSO_INLINE DoubleBits fromUInt64(uint64_t val) { DoubleBits u; u.u = val; return u; }
+
+  MATHPRESSO_INLINE bool isNan() const { return ((hi & 0x7FF00000U)) == 0x7FF00000U && ((hi & 0x000FFFFFU) | lo) != 0x00000000U; }
+  MATHPRESSO_INLINE void setNan() { u = MATHPRESSO_UINT64_C(0x7FF8000000000000); }
+
+  MATHPRESSO_INLINE bool isInf() const { return (hi & 0x7FFFFFFFU) == 0x7FF00000U && lo == 0x00000000U; }
+  MATHPRESSO_INLINE void setInf() { u = MATHPRESSO_UINT64_C(0x7FF0000000000000); }
+
+  MATHPRESSO_INLINE bool isFinite() const { return (hi & 0x7FF00000U) != 0x7FF00000U; }
+
+  uint64_t u;
+  double d;
+
+  struct { uint32_t lo; uint32_t hi; };
+};
 
 // ============================================================================
 // [TestOption]
@@ -85,6 +133,10 @@ struct TestApp {
   double x, y, z, big;
 
   // Functions.
+  inline double isinf(double x) { return DoubleBits::fromDouble(x).isInf() ? 1.0 : 0.0; }
+  inline double isnan(double x) { return DoubleBits::fromDouble(x).isNan() ? 1.0 : 0.0; }
+  inline double isfinite(double x) { return DoubleBits::fromDouble(x).isFinite() ? 1.0 : 0.0; }
+
   inline double avg(double x, double y) { return (x + y) * 0.5; }
   inline double min(double x, double y) { return x < y ? x : y; }
   inline double max(double x, double y) { return x > y ? x : y; }
@@ -228,6 +280,18 @@ struct TestApp {
 
       TEST_INLINE(1.7976931348623157e+308),
       TEST_INLINE(2.2250738585072014e-308),
+
+      TEST_INLINE(isinf(x)),
+      TEST_INLINE(isnan(x)),
+      TEST_INLINE(isfinite(x)),
+
+      TEST_INLINE(isinf(0.0 / 0.0)),
+      TEST_INLINE(isnan(0.0 / 0.0)),
+      TEST_INLINE(isfinite(0.0 / 0.0)),
+
+      TEST_INLINE(isinf(1.0 / 0.0)),
+      TEST_INLINE(isnan(1.0 / 0.0)),
+      TEST_INLINE(isfinite(1.0 / 0.0)),
 
       TEST_INLINE(x + y),
       TEST_INLINE(x - y),
