@@ -11,17 +11,6 @@
 #include <string.h>
 #include <math.h>
 
-#if defined(_MSC_VER) && (_MSC_VER < 1600)
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-# define MATHPRESSO_INT64_C(x) (x##i64)
-# define MATHPRESSO_UINT64_C(x) (x##ui64)
-#else
-# include <stdint.h>
-# define MATHPRESSO_INT64_C(x) (x##ll)
-# define MATHPRESSO_UINT64_C(x) (x##ull)
-#endif
-
 // Undef all macros that could collide with mathpresso language builtins (see tests).
 #if defined(min)
 # undef min
@@ -56,21 +45,17 @@ inline void set_x87_mode(unsigned short mode) {
 // This is a copy-pase from `mpeval_p.h`, we can't include it here since it's
 // private.
 union DoubleBits {
-  static MATHPRESSO_INLINE DoubleBits fromDouble(double val) { DoubleBits u; u.d = val; return u; }
-  static MATHPRESSO_INLINE DoubleBits fromUInt64(uint64_t val) { DoubleBits u; u.u = val; return u; }
+  static MATHPRESSO_INLINE DoubleBits fromDouble(double d) { DoubleBits u; u.d = d; return u; }
 
-  MATHPRESSO_INLINE bool isNan() const { return ((hi & 0x7FF00000U)) == 0x7FF00000U && ((hi & 0x000FFFFFU) | lo) != 0x00000000U; }
-  MATHPRESSO_INLINE void setNan() { u = MATHPRESSO_UINT64_C(0x7FF8000000000000); }
+  MATHPRESSO_INLINE void setNan() { hi = 0x7FF80000U; lo = 0x00000000U; }
+  MATHPRESSO_INLINE void setInf() { hi = 0x7FF00000U; lo = 0x00000000U; }
 
+  MATHPRESSO_INLINE bool isNan() const { return (hi & 0x7FF00000U) == 0x7FF00000U && ((hi & 0x000FFFFFU) | lo) != 0x00000000U; }
   MATHPRESSO_INLINE bool isInf() const { return (hi & 0x7FFFFFFFU) == 0x7FF00000U && lo == 0x00000000U; }
-  MATHPRESSO_INLINE void setInf() { u = MATHPRESSO_UINT64_C(0x7FF0000000000000); }
-
   MATHPRESSO_INLINE bool isFinite() const { return (hi & 0x7FF00000U) != 0x7FF00000U; }
 
-  uint64_t u;
   double d;
-
-  struct { uint32_t lo; uint32_t hi; };
+  struct { unsigned int lo, hi; };
 };
 
 // ============================================================================

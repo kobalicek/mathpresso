@@ -26,12 +26,11 @@ union DoubleBits {
   static MATHPRESSO_INLINE DoubleBits fromDouble(double val) { DoubleBits u; u.d = val; return u; }
   static MATHPRESSO_INLINE DoubleBits fromUInt64(uint64_t val) { DoubleBits u; u.u = val; return u; }
 
-  MATHPRESSO_INLINE bool isNan() const { return ((hi & 0x7FF00000U)) == 0x7FF00000U && ((hi & 0x000FFFFFU) | lo) != 0x00000000U; }
-  MATHPRESSO_INLINE void setNan() { u = MATHPRESSO_UINT64_C(0x7FF8000000000000); }
+  MATHPRESSO_INLINE void setNan() { hi = 0x7FF80000U; lo = 0x00000000U; }
+  MATHPRESSO_INLINE void setInf() { hi = 0x7FF00000U; lo = 0x00000000U; }
 
+  MATHPRESSO_INLINE bool isNan() const { return (hi & 0x7FF00000U) == 0x7FF00000U && ((hi & 0x000FFFFFU) | lo) != 0x00000000U; }
   MATHPRESSO_INLINE bool isInf() const { return (hi & 0x7FFFFFFFU) == 0x7FF00000U && lo == 0x00000000U; }
-  MATHPRESSO_INLINE void setInf() { u = MATHPRESSO_UINT64_C(0x7FF0000000000000); }
-
   MATHPRESSO_INLINE bool isFinite() const { return (hi & 0x7FF00000U) != 0x7FF00000U; }
 
   //! Value as uint64_t.
