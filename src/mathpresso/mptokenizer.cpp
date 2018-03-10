@@ -230,8 +230,6 @@ _Repeat:
 
     // Parse fraction.
     if (p != pEnd && p[0] == '.') {
-      size_t scale = 0;
-
       while (++p != pEnd) {
         c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
         if (c > 9)
