@@ -22,7 +22,7 @@ namespace HashUtils {
   static MATHPRESSO_INLINE uint32_t hashPointer(const void* kPtr) {
     uintptr_t p = (uintptr_t)kPtr;
     return static_cast<uint32_t>(
-      ((p >> 3) ^ (p >> 7) ^ (p >> 12) ^ (p >> 20) ^ (p >> 27)) & 0xFFFFFFFFU);
+      ((p >> 3) ^ (p >> 7) ^ (p >> 12) ^ (p >> 20) ^ (p >> 27)) & 0xFFFFFFFFu);
   }
 
   // \internal
@@ -32,9 +32,9 @@ namespace HashUtils {
 
   // \internal
   //
-  // Get a hash of the given string `kStr` of `kLen` length. This function doesn't
-  // require `kStr` to be NULL terminated.
-  MATHPRESSO_NOAPI uint32_t hashString(const char* kStr, size_t kLen);
+  // Get a hash of the given string `data` of size `size`. This function doesn't
+  // require `key` to be NULL terminated.
+  MATHPRESSO_NOAPI uint32_t hashString(const char* data, size_t size);
 
   // \internal
   //
@@ -47,12 +47,12 @@ namespace HashUtils {
 // ============================================================================
 
 struct HashNode {
-  MATHPRESSO_INLINE HashNode(uint32_t hVal = 0) : _next(NULL), _hVal(hVal) {}
+  MATHPRESSO_INLINE HashNode(uint32_t hashCode = 0) : _next(NULL), _hashCode(hashCode) {}
 
   //! Next node in the chain, NULL if last node.
   HashNode* _next;
   //! Hash code.
-  uint32_t _hVal;
+  uint32_t _hashCode;
 };
 
 // ============================================================================
@@ -60,7 +60,7 @@ struct HashNode {
 // ============================================================================
 
 struct HashBase {
-  MATHPRESSO_NO_COPY(HashBase)
+  MATHPRESSO_NONCOPYABLE(HashBase)
 
   enum {
     kExtraFirst = 0,
@@ -71,9 +71,9 @@ struct HashBase {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE HashBase(ZoneHeap* heap) {
-    _heap = heap;
-    _length = 0;
+  MATHPRESSO_INLINE HashBase(ZoneAllocator* allocator) {
+    _allocator = allocator;
+    _size = 0;
 
     _bucketsCount = 1;
     _bucketsGrow = 1;
@@ -85,14 +85,14 @@ struct HashBase {
 
   MATHPRESSO_INLINE ~HashBase() {
     if (_data != _embedded)
-      _heap->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
+      _allocator->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
   }
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE ZoneHeap* getHeap() const { return _heap; }
+  MATHPRESSO_INLINE ZoneAllocator* allocator() const { return _allocator; }
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -108,9 +108,9 @@ struct HashBase {
   // [Reset / Rehash]
   // --------------------------------------------------------------------------
 
-  ZoneHeap* _heap;
+  ZoneAllocator* _allocator;
 
-  uint32_t _length;
+  uint32_t _size;
   uint32_t _bucketsCount;
   uint32_t _bucketsGrow;
 
@@ -147,8 +147,8 @@ struct Hash : public HashBase {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Hash(ZoneHeap* heap)
-    : HashBase(heap) {}
+  MATHPRESSO_INLINE Hash(ZoneAllocator* allocator)
+    : HashBase(allocator) {}
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -170,12 +170,12 @@ struct Hash : public HashBase {
     }
 
     if (data != _embedded)
-      _heap->release(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
+      _allocator->release(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
 
     _bucketsCount = 1;
     _bucketsGrow = 1;
 
-    _length = 0;
+    _size = 0;
     _data = _embedded;
 
     for (uint32_t i = 0; i <= kExtraCount; i++)
@@ -186,8 +186,8 @@ struct Hash : public HashBase {
     _mergeToInvisibleSlot(other);
   }
 
-  MATHPRESSO_INLINE Node* get(const Key& key, uint32_t hVal) const {
-    uint32_t hMod = hVal % _bucketsCount;
+  MATHPRESSO_INLINE Node* get(const Key& key, uint32_t hashCode) const {
+    uint32_t hMod = hashCode % _bucketsCount;
     Node* node = static_cast<Node*>(_data[hMod]);
 
     while (node != NULL) {
@@ -267,11 +267,11 @@ struct HashIterator {
 //! \internal
 template<typename Key, typename Value>
 struct Map {
-  MATHPRESSO_NO_COPY(Map)
+  MATHPRESSO_NONCOPYABLE(Map)
 
   struct Node : public HashNode {
-    MATHPRESSO_INLINE Node(const Key& key, const Value& value, uint32_t hVal)
-      : HashNode(hVal),
+    MATHPRESSO_INLINE Node(const Key& key, const Value& value, uint32_t hashCode)
+      : HashNode(hashCode),
         _key(key),
         _value(value) {}
     MATHPRESSO_INLINE bool eq(const Key& key) { return _key == key; }
@@ -281,21 +281,21 @@ struct Map {
   };
 
   struct ReleaseHandler {
-    MATHPRESSO_INLINE ReleaseHandler(ZoneHeap* heap) : _heap(heap) {}
-    MATHPRESSO_INLINE void release(Node* node) { _heap->release(node, sizeof(Node)); }
+    MATHPRESSO_INLINE ReleaseHandler(ZoneAllocator* allocator) : _allocator(allocator) {}
+    MATHPRESSO_INLINE void release(Node* node) { _allocator->release(node, sizeof(Node)); }
 
-    ZoneHeap* _heap;
+    ZoneAllocator* _allocator;
   };
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Map(ZoneHeap* heap)
-    : _hash(heap) {}
+  MATHPRESSO_INLINE Map(ZoneAllocator* allocator)
+    : _hash(allocator) {}
 
   MATHPRESSO_INLINE ~Map() {
-    ReleaseHandler releaseHandler(_hash.getHeap());
+    ReleaseHandler releaseHandler(_hash.allocator());
     _hash.reset(releaseHandler);
   }
 
@@ -304,8 +304,8 @@ struct Map {
   // --------------------------------------------------------------------------
 
   MATHPRESSO_INLINE Value get(const Key& key) const {
-    uint32_t hVal = HashUtils::hashPointer(key);
-    uint32_t hMod = hVal % _hash._bucketsCount;
+    uint32_t hashCode = HashUtils::hashPointer(key);
+    uint32_t hMod = hashCode % _hash._bucketsCount;
     Node* node = static_cast<Node*>(_hash._data[hMod]);
 
     while (node != NULL) {
@@ -318,12 +318,12 @@ struct Map {
   }
 
   MATHPRESSO_INLINE Error put(const Key& key, const Value& value) {
-    Node* node = static_cast<Node*>(_hash._heap->alloc(sizeof(Node)));
+    Node* node = static_cast<Node*>(_hash._allocator->alloc(sizeof(Node)));
     if (node == NULL)
       return MATHPRESSO_TRACE_ERROR(kErrorNoMemory);
 
-    uint32_t hVal = HashUtils::hashPointer(key);
-    _hash.put(new(node) Node(key, value, hVal));
+    uint32_t hashCode = HashUtils::hashPointer(key);
+    _hash.put(new(node) Node(key, value, hashCode));
 
     return kErrorOk;
   }

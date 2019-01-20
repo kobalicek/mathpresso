@@ -5,7 +5,7 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Export]
-#define MATHPRESSO_EXPORTS
+#define MATHPRESSO_BUILD_EXPORT
 
 // [Dependencies]
 #include "./mathpresso_p.h"
@@ -32,15 +32,14 @@ namespace mathpresso {
 // fully compatible with C.
 #define ROW(opType, altType, params, precedence, assignment, intrinsic, flags, name) \
   { \
-    static_cast<uint8_t>(kOp##opType), \
-    static_cast<uint8_t>(kOp##altType), \
-    static_cast<uint8_t>(precedence), \
-    0, \
-    static_cast<uint32_t>( \
-      flags | (assignment != 0 ? kOpFlagAssign : 0) \
-            | (params     == 1 ? kOpFlagUnary : \
-               params     == 2 ? kOpFlagBinary : 0) \
-            | (intrinsic  == 1 ? kOpFlagIntrinsic : 0)), \
+    uint8_t(kOp##opType), \
+    uint8_t(kOp##altType), \
+    uint8_t(precedence), \
+    uint8_t(0), \
+    uint32_t(flags | (assignment != 0 ? uint32_t(kOpFlagAssign   ) : uint32_t(0)) \
+                   | (params     == 1 ? uint32_t(kOpFlagUnary    ) : uint32_t(0)) \
+                   | (params     == 2 ? uint32_t(kOpFlagBinary   ) : uint32_t(0)) \
+                   | (intrinsic  == 1 ? uint32_t(kOpFlagIntrinsic) : uint32_t(0))), \
     name \
   }
 #define LTR 0
@@ -151,16 +150,16 @@ static const ContextImpl mpContextNull = { 0 };
 //! Internal context data.
 struct ContextInternalImpl : public ContextImpl {
   MATHPRESSO_INLINE ContextInternalImpl()
-    : _zone(32768 - Zone::kZoneOverhead),
-      _heap(&_zone),
-      _builder(&_heap),
-      _scope(&_builder, static_cast<AstScope*>(NULL), kAstScopeGlobal) {
+    : _zone(32768 - Zone::kBlockOverhead),
+      _allocator(&_zone),
+      _builder(&_allocator),
+      _scope(&_builder, nullptr, kAstScopeGlobal) {
     mpAtomicSet(&_refCount, 1);
   }
   MATHPRESSO_INLINE ~ContextInternalImpl() {}
 
   Zone _zone;
-  ZoneHeap _heap;
+  ZoneAllocator _allocator;
   AstBuilder _builder;
   AstScope _scope;
 };
@@ -178,7 +177,8 @@ static MATHPRESSO_INLINE void mpContextRelease(ContextImpl* d) {
 
 static ContextImpl* mpContextClone(ContextImpl* otherD_) {
   ContextInternalImpl* d = new(std::nothrow) ContextInternalImpl();
-  if (MATHPRESSO_UNLIKELY(d == NULL)) return NULL;
+  if (MATHPRESSO_UNLIKELY(!d))
+    return nullptr;
 
   if (otherD_ != &mpContextNull) {
     ContextInternalImpl* otherD = static_cast<ContextInternalImpl*>(otherD_);
@@ -187,29 +187,29 @@ static ContextImpl* mpContextClone(ContextImpl* otherD_) {
     while (it.has()) {
       AstSymbol* sym = it.get();
 
-      StringRef name(sym->_name, sym->_length);
-      uint32_t hVal = sym->getHVal();
-      uint32_t type = sym->getSymbolType();
+      StringRef name(sym->_name, sym->_nameSize);
+      uint32_t hashCode = sym->hashCode();
+      uint32_t type = sym->symbolType();
 
-      AstSymbol* clonedSym = d->_builder.newSymbol(name, hVal, type, otherD->_scope.getScopeType());
-      if (MATHPRESSO_UNLIKELY(clonedSym == NULL)) {
+      AstSymbol* clonedSym = d->_builder.newSymbol(name, hashCode, type, otherD->_scope.scopeType());
+      if (MATHPRESSO_UNLIKELY(!clonedSym)) {
         delete d;
-        return NULL;
+        return nullptr;
       }
 
       clonedSym->_symbolFlags = sym->_symbolFlags;
       switch (type) {
         case kAstSymbolVariable:
-          clonedSym->setVarSlotId(sym->getVarSlotId());
-          clonedSym->setVarOffset(sym->getVarOffset());
-          clonedSym->_value = sym->getValue();
+          clonedSym->setVarSlotId(sym->varSlotId());
+          clonedSym->setVarOffset(sym->varOffset());
+          clonedSym->_value = sym->value();
           break;
 
         case kAstSymbolIntrinsic:
         case kAstSymbolFunction:
-          clonedSym->setOpType(sym->getOpType());
-          clonedSym->setFuncArgs(sym->getFuncArgs());
-          clonedSym->setFuncPtr(sym->getFuncPtr());
+          clonedSym->setOpType(sym->opType());
+          clonedSym->setFuncArgs(sym->funcArgs());
+          clonedSym->setFuncPtr(sym->funcPtr());
           break;
 
         default:
@@ -233,7 +233,7 @@ static Error mpContextMutable(Context* self, ContextInternalImpl** out) {
   }
   else {
     d = mpContextClone(d);
-    if (MATHPRESSO_UNLIKELY(d == NULL))
+    if (MATHPRESSO_UNLIKELY(!d))
       return MATHPRESSO_TRACE_ERROR(kErrorNoMemory);
 
     mpContextRelease(
@@ -301,15 +301,15 @@ Error Context::addBuiltIns(void) {
       continue;
 
     StringRef name(op.name, ::strlen(op.name));
-    uint32_t hVal = HashUtils::hashString(name.getData(), name.getLength());
+    uint32_t hashCode = HashUtils::hashString(name.data(), name.size());
 
-    AstSymbol* sym = d->_builder.newSymbol(name, hVal, kAstSymbolIntrinsic, kAstScopeGlobal);
+    AstSymbol* sym = d->_builder.newSymbol(name, hashCode, kAstSymbolIntrinsic, kAstScopeGlobal);
     MATHPRESSO_NULLCHECK(sym);
 
     sym->setDeclared();
     sym->setOpType(op.type);
-    sym->setFuncArgs(op.getOpCount());
-    sym->setFuncPtr(NULL);
+    sym->setFuncArgs(op.opCount());
+    sym->setFuncPtr(nullptr);
 
     d->_scope.putSymbol(sym);
   }
@@ -325,9 +325,9 @@ Error Context::addBuiltIns(void) {
     const GlobalConstant& c = mpGlobalConstants[i];
 
     StringRef name(c.name, ::strlen(c.name));
-    uint32_t hVal = HashUtils::hashString(name.getData(), name.getLength());
+    uint32_t hashCode = HashUtils::hashString(name.data(), name.size());
 
-    AstSymbol* sym = d->_builder.newSymbol(name, hVal, kAstSymbolVariable, kAstScopeGlobal);
+    AstSymbol* sym = d->_builder.newSymbol(name, hashCode, kAstSymbolVariable, kAstScopeGlobal);
     MATHPRESSO_NULLCHECK(sym);
 
     sym->setSymbolFlag(kAstSymbolIsDeclared | kAstSymbolIsAssigned | kAstSymbolIsReadOnly);
@@ -344,15 +344,15 @@ Error Context::addBuiltIns(void) {
 #define MATHPRESSO_ADD_SYMBOL(name, type) \
   AstSymbol* sym; \
   { \
-    size_t nlen = strlen(name); \
-    uint32_t hVal = HashUtils::hashString(name, nlen); \
+    size_t nameSize = strlen(name); \
+    uint32_t hashCode = HashUtils::hashString(name, nameSize); \
     \
-    sym = d->_scope.getSymbol(StringRef(name, nlen), hVal); \
-    if (sym != NULL) \
+    sym = d->_scope.getSymbol(StringRef(name, nameSize), hashCode); \
+    if (sym) \
       return MATHPRESSO_TRACE_ERROR(kErrorSymbolAlreadyExists); \
     \
-    sym = d->_builder.newSymbol(StringRef(name, nlen), hVal, type, kAstScopeGlobal); \
-    if (sym == NULL) \
+    sym = d->_builder.newSymbol(StringRef(name, nameSize), hashCode, type, kAstScopeGlobal); \
+    if (!sym) \
       return MATHPRESSO_TRACE_ERROR(kErrorNoMemory); \
     d->_scope.putSymbol(sym); \
   }
@@ -404,10 +404,10 @@ Error Context::delSymbol(const char* name) {
   MATHPRESSO_PROPAGATE(mpContextMutable(this, &d));
 
   size_t nlen = strlen(name);
-  uint32_t hVal = HashUtils::hashString(name, nlen);
+  uint32_t hashCode = HashUtils::hashString(name, nlen);
 
-  AstSymbol* sym = d->_scope.getSymbol(StringRef(name, nlen), hVal);
-  if (sym == NULL)
+  AstSymbol* sym = d->_scope.getSymbol(StringRef(name, nlen), hashCode);
+  if (!sym)
     return MATHPRESSO_TRACE_ERROR(kErrorSymbolNotFound);
 
   d->_builder.deleteSymbol(d->_scope.removeSymbol(sym));
@@ -429,48 +429,48 @@ Error Expression::compile(const Context& ctx, const char* body, unsigned int opt
   // Init options first.
   options &= _kOptionsMask;
 
-  if (log != NULL)
+  if (log)
     options |= kInternalOptionLog;
   else
-    options &= ~(kOptionVerbose | kOptionDebugAst | kOptionDebugAsm);
+    options &= ~(kOptionVerbose | kOptionDebugAst | kOptionDebugMachineCode | kOptionDebugCompiler);
 
-  Zone zone(32768 - Zone::kZoneOverhead);
-  ZoneHeap heap(&zone);
-  StringBuilderTmp<512> sbTmp;
+  Zone zone(32768 - Zone::kBlockOverhead);
+  ZoneAllocator allocator(&zone);
+  StringTmp<512> sbTmp;
 
   // Initialize AST.
-  AstBuilder ast(&heap);
+  AstBuilder ast(&allocator);
   MATHPRESSO_PROPAGATE(ast.initProgramScope());
 
   ContextImpl* d = ctx._d;
   if (d != &mpContextNull)
-    ast.getRootScope()->shadowContextScope(&static_cast<ContextInternalImpl*>(d)->_scope);
+    ast.rootScope()->shadowContextScope(&static_cast<ContextInternalImpl*>(d)->_scope);
 
   // Setup basic data structures used during parsing and compilation.
-  size_t len = ::strlen(body);
-  ErrorReporter errorReporter(body, len, options, log);
+  size_t size = ::strlen(body);
+  ErrorReporter errorReporter(body, size, options, log);
 
   // Parse the expression into AST.
-  { MATHPRESSO_PROPAGATE(Parser(&ast, &errorReporter, body, len).parseProgram(ast.getProgramNode())); }
+  { MATHPRESSO_PROPAGATE(Parser(&ast, &errorReporter, body, size).parseProgram(ast.programNode())); }
 
   if (options & kOptionDebugAst) {
     ast.dump(sbTmp);
-    log->log(OutputLog::kMessageAstInitial, 0, 0, sbTmp.getData(), sbTmp.getLength());
+    log->log(OutputLog::kMessageAstInitial, 0, 0, sbTmp.data(), sbTmp.size());
     sbTmp.clear();
   }
 
   // Perform basic optimizations at AST level.
-  { MATHPRESSO_PROPAGATE(AstOptimizer(&ast, &errorReporter).onProgram(ast.getProgramNode())); }
+  { MATHPRESSO_PROPAGATE(AstOptimizer(&ast, &errorReporter).onProgram(ast.programNode())); }
 
   if (options & kOptionDebugAst) {
     ast.dump(sbTmp);
-    log->log(OutputLog::kMessageAstFinal, 0, 0, sbTmp.getData(), sbTmp.getLength());
+    log->log(OutputLog::kMessageAstFinal, 0, 0, sbTmp.data(), sbTmp.size());
     sbTmp.clear();
   }
 
   // Compile the function to machine code.
   CompiledFunc fn = mpCompileFunction(&ast, options, log);
-  if (fn == NULL)
+  if (!fn)
     return MATHPRESSO_TRACE_ERROR(kErrorNoMemory);
 
   reset();
@@ -504,7 +504,7 @@ OutputLog::~OutputLog() {}
 
 void ErrorReporter::getLineAndColumn(uint32_t position, uint32_t& line, uint32_t& column) {
   // Should't happen, but be defensive.
-  if (static_cast<size_t>(position) >= _len) {
+  if (static_cast<size_t>(position) >= _size) {
     line = 0;
     column = 0;
     return;
@@ -536,34 +536,34 @@ void ErrorReporter::getLineAndColumn(uint32_t position, uint32_t& line, uint32_t
 
 void ErrorReporter::onWarning(uint32_t position, const char* fmt, ...) {
   if (reportsWarnings()) {
-    StringBuilderTmp<256> sb;
+    StringTmp<256> sb;
 
     va_list ap;
     va_start(ap, fmt);
 
-    sb.appendFormatVA(fmt, ap);
+    sb.appendVFormat(fmt, ap);
 
     va_end(ap);
     onWarning(position, sb);
   }
 }
 
-void ErrorReporter::onWarning(uint32_t position, const StringBuilder& msg) {
+void ErrorReporter::onWarning(uint32_t position, const String& msg) {
   if (reportsWarnings()) {
     uint32_t line, column;
     getLineAndColumn(position, line, column);
-    _log->log(OutputLog::kMessageWarning, line, column, msg.getData(), msg.getLength());
+    _log->log(OutputLog::kMessageWarning, line, column, msg.data(), msg.size());
   }
 }
 
 Error ErrorReporter::onError(Error error, uint32_t position, const char* fmt, ...) {
   if (reportsErrors()) {
-    StringBuilderTmp<256> sb;
+    StringTmp<256> sb;
 
     va_list ap;
     va_start(ap, fmt);
 
-    sb.appendFormatVA(fmt, ap);
+    sb.appendVFormat(fmt, ap);
 
     va_end(ap);
     return onError(error, position, sb);
@@ -573,11 +573,11 @@ Error ErrorReporter::onError(Error error, uint32_t position, const char* fmt, ..
   }
 }
 
-Error ErrorReporter::onError(Error error, uint32_t position, const StringBuilder& msg) {
+Error ErrorReporter::onError(Error error, uint32_t position, const String& msg) {
   if (reportsErrors()) {
     uint32_t line, column;
     getLineAndColumn(position, line, column);
-    _log->log(OutputLog::kMessageError, line, column, msg.getData(), msg.getLength());
+    _log->log(OutputLog::kMessageError, line, column, msg.data(), msg.size());
   }
 
   return MATHPRESSO_TRACE_ERROR(error);

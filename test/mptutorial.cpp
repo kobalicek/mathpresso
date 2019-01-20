@@ -21,7 +21,7 @@ struct Data {
 // `kMessageError`, because it signalizes an invalid expression. Other message
 // types are used mostly for debugging.
 struct MyOutputLog : public mathpresso::OutputLog {
-  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
     switch (type) {
       case kMessageError:
         printf("[ERROR]: %s (line %u, column %u)\n", message, line, column);
@@ -62,10 +62,10 @@ int main(int argc, char* argv[]) {
 
   // The following options will cause that MathPresso will send everything
   // it does to `OutputLog`.
-  unsigned int options = 
-    mathpresso::kOptionVerbose  | // Enable warnings, not just errors.
-    mathpresso::kOptionDebugAst | // Enable AST dumps.
-    mathpresso::kOptionDebugAsm ; // Enable ASM dumps.
+  unsigned int options =
+    mathpresso::kOptionVerbose         | // Enable warnings, not just errors.
+    mathpresso::kOptionDebugAst        | // Enable AST dumps.
+    mathpresso::kOptionDebugMachineCode; // Enable machine code dumps.
 
   mathpresso::Expression exp;
   mathpresso::Error err = exp.compile(ctx,

@@ -6,10 +6,11 @@
 
 #include "../src/mathpresso/mathpresso.h"
 
+#include <limits>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 // Undef all macros that could collide with mathpresso language builtins (see tests).
 #if defined(min)
@@ -32,8 +33,8 @@
 # undef isfinite
 #endif
 
-#if defined(__GNUC__) || defined(__clang__)
-inline void set_x87_mode(unsigned short mode) {
+#if defined(__GNUC__)
+static inline void set_x87_mode(unsigned short mode) {
   __asm__ __volatile__ ("fldcw %0" :: "m" (*&mode));
 }
 #endif
@@ -47,12 +48,12 @@ inline void set_x87_mode(unsigned short mode) {
 union DoubleBits {
   static MATHPRESSO_INLINE DoubleBits fromDouble(double d) { DoubleBits u; u.d = d; return u; }
 
-  MATHPRESSO_INLINE void setNan() { hi = 0x7FF80000U; lo = 0x00000000U; }
-  MATHPRESSO_INLINE void setInf() { hi = 0x7FF00000U; lo = 0x00000000U; }
+  MATHPRESSO_INLINE void setNan() { hi = 0x7FF80000u; lo = 0x00000000u; }
+  MATHPRESSO_INLINE void setInf() { hi = 0x7FF00000u; lo = 0x00000000u; }
 
-  MATHPRESSO_INLINE bool isNan() const { return (hi & 0x7FF00000U) == 0x7FF00000U && ((hi & 0x000FFFFFU) | lo) != 0x00000000U; }
-  MATHPRESSO_INLINE bool isInf() const { return (hi & 0x7FFFFFFFU) == 0x7FF00000U && lo == 0x00000000U; }
-  MATHPRESSO_INLINE bool isFinite() const { return (hi & 0x7FF00000U) != 0x7FF00000U; }
+  MATHPRESSO_INLINE bool isNan() const { return (hi & 0x7FF00000u) == 0x7FF00000u && ((hi & 0x000FFFFFu) | lo) != 0x00000000u; }
+  MATHPRESSO_INLINE bool isInf() const { return (hi & 0x7FFFFFFFu) == 0x7FF00000u && lo == 0x00000000u; }
+  MATHPRESSO_INLINE bool isFinite() const { return (hi & 0x7FF00000u) != 0x7FF00000u; }
 
   double d;
   struct { unsigned int lo, hi; };
@@ -84,7 +85,7 @@ struct TestExpression {
 struct TestOutputLog : public mathpresso::OutputLog {
   TestOutputLog() {}
   virtual ~TestOutputLog() {}
-  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
     switch (type) {
       case kMessageError     : printf("[Failure]: %s (at %u)\n", message, column); break;
       case kMessageWarning   : printf("[Warning]: %s (at %u)\n", message, column); break;
@@ -141,15 +142,14 @@ struct TestApp {
   // --------------------------------------------------------------------------
 
   TestApp(int argc, char* argv[])
-    : argc(argc),
-      argv(argv),
-      E(2.7182818284590452354),
+    : E(2.7182818284590452354),
       PI(3.14159265358979323846),
       x(1.5),
       y(2.5),
       z(9.9),
-      big(4503599627370496.0) {
-  }
+      big(4503599627370496.0),
+      argc(argc),
+      argv(argv) {}
 
   bool hasArg(const char* arg) {
     for (int i = 1; i < argc; i++) {
@@ -163,13 +163,14 @@ struct TestApp {
   int run() {
     bool failed = false;
     bool verbose = hasArg("--verbose");
+    bool debugCompiler = hasArg("--debug-compiler");
 
     // Set the FPU precision to `double` if running 32-bit. Required
     // to be able to compare the result of C++ code with JIT code.
-#if defined(__GNUC__) || defined(__clang__)
+    #if defined(__GNUC__)
     if (sizeof(void*) == 4)
-      set_x87_mode(0x027FU);
-#endif
+      set_x87_mode(0x027Fu);
+    #endif
 
     mathpresso::Context ctx;
     mathpresso::Expression e;
@@ -184,14 +185,18 @@ struct TestApp {
     ctx.addFunction("custom1", (void*)custom1, mathpresso::kFunctionArg1);
     ctx.addFunction("custom2", (void*)custom2, mathpresso::kFunctionArg2);
 
-#define TEST_INLINE(exp) { #exp, (double)(exp), { x, y, z } }
-#define TEST_STRING(str, result) { str, result, { x, y, z } }
-#define TEST_OUTPUT(str, result, x, y, z) { str, result, { x, y, z } }
+    #define TEST_INLINE(exp) { #exp, (double)(exp), { x, y, z } }
+    #define TEST_STRING(str, result) { str, result, { x, y, z } }
+    #define TEST_OUTPUT(str, result, x, y, z) { str, result, { x, y, z } }
 
     TestExpression tests[] = {
       TEST_INLINE(0.0),
       TEST_INLINE(10.0),
+      TEST_INLINE(10.5),
+      TEST_INLINE(10.55),
+      TEST_INLINE(10.055),
       TEST_INLINE(100.0),
+      TEST_INLINE(100.5),
       TEST_INLINE(1999.0),
 
       TEST_INLINE(3.14),
@@ -270,13 +275,13 @@ struct TestApp {
       TEST_INLINE(isnan(x)),
       TEST_INLINE(isfinite(x)),
 
-      TEST_INLINE(isinf(0.0 / 0.0)),
-      TEST_INLINE(isnan(0.0 / 0.0)),
-      TEST_INLINE(isfinite(0.0 / 0.0)),
+      TEST_STRING("isinf(0.0 / 0.0)", isinf(std::numeric_limits<double>::quiet_NaN())),
+      TEST_STRING("isnan(0.0 / 0.0)", isnan(std::numeric_limits<double>::quiet_NaN())),
+      TEST_STRING("isfinite(0.0 / 0.0)", isfinite(std::numeric_limits<double>::quiet_NaN())),
 
-      TEST_INLINE(isinf(1.0 / 0.0)),
-      TEST_INLINE(isnan(1.0 / 0.0)),
-      TEST_INLINE(isfinite(1.0 / 0.0)),
+      TEST_STRING("isinf(1.0 / 0.0)", isinf(std::numeric_limits<double>::infinity())),
+      TEST_STRING("isnan(1.0 / 0.0)", isnan(std::numeric_limits<double>::infinity())),
+      TEST_STRING("isfinite(1.0 / 0.0)", isfinite(std::numeric_limits<double>::infinity())),
 
       TEST_INLINE(x + y),
       TEST_INLINE(x - y),
@@ -308,7 +313,7 @@ struct TestApp {
 
       TEST_STRING("-(x % y)", -(::fmod(x, y))),
 
-#if 0 // Temporarily disabled as it hangs VS, I don't know why.
+      #if 0 // Temporarily disabled as it hangs VS, I don't know why.
       TEST_INLINE(x * z + y * z),
       TEST_INLINE(x * z - y * z),
       TEST_INLINE(x * z * y * z),
@@ -324,7 +329,7 @@ struct TestApp {
       TEST_INLINE(x + y == y - z),
       TEST_INLINE(x * y == y * z),
       TEST_INLINE(x > y == y < z),
-#endif
+      #endif
 
       TEST_INLINE(-x),
       TEST_INLINE(-1.0 + x),
@@ -431,15 +436,20 @@ struct TestApp {
       TEST_OUTPUT("var t = x; x = y; y = z; z = t; t", x, y, z, x)
     };
 
+    #undef TEST_OUTPUT
+    #undef TEST_STRING
+    #undef TEST_INLINE
+
     unsigned int defaultOptions = mathpresso::kNoOptions;
-    if (verbose) {
-      defaultOptions |= mathpresso::kOptionVerbose  |
-                        mathpresso::kOptionDebugAsm ;
-    }
+    if (verbose)
+      defaultOptions |= mathpresso::kOptionVerbose | mathpresso::kOptionDebugMachineCode;
+
+    if (debugCompiler)
+      defaultOptions |= mathpresso::kOptionVerbose | mathpresso::kOptionDebugCompiler;
 
     TestOption options[] = {
-      "SSE2", defaultOptions | mathpresso::kOptionDisableSSE4_1,
-      "BEST", defaultOptions
+      { "SSE2", defaultOptions | mathpresso::kOptionDisableSSE4_1 },
+      { "BEST", defaultOptions                                    }
     };
 
     printf("MPTest environment:\n");

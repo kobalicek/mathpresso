@@ -8,11 +8,8 @@
 #ifndef _MATHPRESSO_H
 #define _MATHPRESSO_H
 
-#include <stdlib.h>
-
-#if !defined(_MSC_VER)
 #include <stdint.h>
-#endif
+#include <stdlib.h>
 
 namespace mathpresso {
 
@@ -20,9 +17,18 @@ namespace mathpresso {
 // [mathpresso::Configuration]
 // ============================================================================
 
-// EMBED implies STATIC.
-#if defined(MATHPRESSO_EMBED) && !defined(MATHPRESSO_STATIC)
-# define MATHPRESSO_STATIC
+// DEPRECATED: Will be removed in the future.
+#if defined(MATHPRESSO_BUILD_EMBED) || defined(MATHPRESSO_BUILD_STATIC)
+  #if defined(MATHPRESSO_BUILD_EMBED)
+    #pragma message("'MATHPRESSO_BUILD_EMBED' is deprecated, use 'MATHPRESSO_STATIC'")
+  #endif
+  #if defined(MATHPRESSO_BUILD_STATIC)
+    #pragma message("'MATHPRESSO_BUILD_STATIC' is deprecated, use 'MATHPRESSO_STATIC'")
+  #endif
+
+  #if !defined(MATHPRESSO_STATIC)
+    #define MATHPRESSO_STATIC
+  #endif
 #endif
 
 // ============================================================================
@@ -32,28 +38,26 @@ namespace mathpresso {
 //! \def MATHPRESSO_API
 //!
 //! Mathpresso API decorator.
-#if !defined(MATHPRESSO_API)
-# if defined(MATHPRESSO_STATIC)
-#  define MATHPRESSO_API
-# elif defined(_WINDOWS)
-#  if defined(__GNUC__) || defined(__clang__) && !defined(__MINGW32__)
-#   if defined(MATHPRESSO_EXPORTS)
-#    define MATHPRESSO_API __attribute__((__dllexport__))
-#   else
-#    define MATHPRESSO_API __attribute__((__dllimport__))
-#   endif
-#  else
-#   if defined(MATHPRESSO_EXPORTS)
-#    define MATHPRESSO_API __declspec(dllexport)
-#   else
-#    define MATHPRESSO_API __declspec(dllimport)
-#   endif
-#  endif
-# else
-#  if defined(__clang__) || defined(__GNUC__)
-#   define MATHPRESSO_API __attribute__((__visibility__("default")))
-#  endif
-# endif
+#if !defined(MATHPRESSO_STATIC)
+  #if defined(_WIN32) && (defined(_MSC_VER) || defined(__MINGW32__))
+    #if defined(MATHPRESSO_BUILD_EXPORT)
+      #define MATHPRESSO_API __declspec(dllexport)
+    #else
+      #define MATHPRESSO_API __declspec(dllimport)
+    #endif
+  #elif defined(_WIN32) && defined(__GNUC__)
+    #if defined(MATHPRESSO_BUILD_EXPORT)
+      #define MATHPRESSO_API __attribute__((dllexport))
+    #else
+      #define MATHPRESSO_API __attribute__((dllimport))
+    #endif
+  #elif defined(__GNUC__)
+    #define MATHPRESSO_API __attribute__((__visibility__("default")))
+  #endif
+#endif
+
+#ifndef MATHPRESSO_API
+  #define MATHPRESSO_API
 #endif
 
 //! \def MATHPRESSO_NOAPI
@@ -65,16 +69,16 @@ namespace mathpresso {
 //!
 //! Mathpresso inline decorator.
 #if defined(__clang__)
-# define MATHPRESSO_INLINE inline __attribute__((__always_inline__, __visibility__("hidden")))
+  #define MATHPRESSO_INLINE inline __attribute__((__always_inline__, __visibility__("hidden")))
 #elif defined(__GNUC__)
-# define MATHPRESSO_INLINE inline __attribute__((__always_inline__))
+  #define MATHPRESSO_INLINE inline __attribute__((__always_inline__))
 #elif defined(_MSC_VER)
-# define MATHPRESSO_INLINE __forceinline
+  #define MATHPRESSO_INLINE __forceinline
 #else
-# define MATHPRESSO_INLINE inline
+  #define MATHPRESSO_INLINE inline
 #endif
 
-#define MATHPRESSO_NO_COPY(type) \
+#define MATHPRESSO_NONCOPYABLE(type) \
 private: \
   MATHPRESSO_INLINE type(const type& other); \
   MATHPRESSO_INLINE type& operator=(const type& other); \
@@ -147,28 +151,30 @@ enum ErrorCode {
 //! MathPresso options.
 enum Options {
   //! No options.
-  kNoOptions = 0x00000000,
+  kNoOptions = 0x00000000u,
 
   //! Show messages and warnings.
-  kOptionVerbose = 0x0001,
+  kOptionVerbose = 0x0001u,
   //! Debug AST (shows initial and final AST).
-  kOptionDebugAst = 0x0002,
-  //! Debug assembly generated.
-  kOptionDebugAsm = 0x0008,
+  kOptionDebugAst = 0x0002u,
+  //! Debug machine code generated.
+  kOptionDebugMachineCode = 0x0004u,
+  //! Debug AsmJit's compiler.
+  kOptionDebugCompiler = 0x0008u,
 
   //! Do not use SSE4.1 instruction set even if CPU supports it.
   //!
-  //! NOTE: This is used during testing to ensure that all code-paths produce
+  //! \note This is used during testing to ensure that all code-paths produce
   //! the same results regardless of the highest instruction set used. Since
   //! SSE4.1 is the most beneficial instruction set for MathPresso there is
   //! only this option (MathPresso doesn't use SSE3 and SSSE3 at the moment).
-  kOptionDisableSSE4_1 = 0x4000,
+  kOptionDisableSSE4_1 = 0x4000u,
 
   //! \internal
   //!
   //! Mask of all accessible options, MathPresso uses also \ref InternalOptions
   //! that should not collide with \ref Options.
-  _kOptionsMask = 0xFFFF
+  _kOptionsMask = 0xFFFFu
 };
 
 // ============================================================================
@@ -177,8 +183,8 @@ enum Options {
 
 //! Variable flags.
 enum VariableFlags {
-  kVariableRW = 0x00000000,
-  kVariableRO = 0x00000001
+  kVariableRW = 0x00000000u,
+  kVariableRO = 0x00000001u
 };
 
 // ============================================================================
@@ -187,35 +193,35 @@ enum VariableFlags {
 
 enum FunctionFlags {
   //! Function has 0 arguments.
-  kFunctionArg0 = 0x00000000,
+  kFunctionArg0 = 0x00000000u,
   //! Function has 1 argument.
-  kFunctionArg1 = 0x00000001,
+  kFunctionArg1 = 0x00000001u,
   //! Function has 2 arguments.
-  kFunctionArg2 = 0x00000002,
+  kFunctionArg2 = 0x00000002u,
   //! Function has 3 arguments.
-  kFunctionArg3 = 0x00000003,
+  kFunctionArg3 = 0x00000003u,
   //! Function has 4 arguments.
-  kFunctionArg4 = 0x00000004,
+  kFunctionArg4 = 0x00000004u,
   //! Function has 5 arguments.
-  kFunctionArg5 = 0x00000005,
+  kFunctionArg5 = 0x00000005u,
   //! Function has 6 arguments.
-  kFunctionArg6 = 0x00000006,
+  kFunctionArg6 = 0x00000006u,
   //! Function has 7 arguments.
-  kFunctionArg7 = 0x00000007,
+  kFunctionArg7 = 0x00000007u,
   //! Function has 8 arguments.
-  kFunctionArg8 = 0x00000008,
+  kFunctionArg8 = 0x00000008u,
 
   //! \internal
-  _kFunctionArgMask = 0x0000000F,
+  _kFunctionArgMask = 0x0000000Fu,
 
   //! The first argument of the function is the `data` pointer passed to the
   //! evaluate function. This is a hidden parameter that is not accessible
   //! within the expression itself.
-  kFunctionFirstArgData = 0x10000000,
+  kFunctionFirstArgData = 0x10000000u,
 
   //! Function doesn't have side-effects and can be evaluated (i.e. optimized
   //! out) during a constant folding phase.
-  kFunctionNoSideEffects = 0x80000000
+  kFunctionNoSideEffects = 0x80000000u
 };
 
 // ============================================================================
@@ -290,7 +296,7 @@ struct Context {
 
 //! MathPresso expression.
 struct Expression {
-  MATHPRESSO_NO_COPY(Expression)
+  MATHPRESSO_NONCOPYABLE(Expression)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -372,7 +378,7 @@ struct MATHPRESSO_API OutputLog {
   // [Interface]
   // --------------------------------------------------------------------------
 
-  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) = 0;
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) = 0;
 };
 
 } // mathpresso namespace

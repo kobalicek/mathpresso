@@ -5,7 +5,7 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Export]
-#define MATHPRESSO_EXPORTS
+#define MATHPRESSO_BUILD_EXPORT
 
 // [Dependencies]
 #include "./mpast_p.h"
@@ -30,17 +30,17 @@ AstOptimizer::~AstOptimizer() {}
 Error AstOptimizer::onBlock(AstBlock* node) {
   // Prevent removing nodes that are not stored in pure `AstBlock`. For example
   // function call inherits from `AstBlock`, but it needs each expression passed.
-  bool alterable = node->getNodeType() == kAstNodeBlock;
+  bool alterable = node->nodeType() == kAstNodeBlock;
 
   uint32_t i = 0;
-  uint32_t curCount = node->getLength();
+  uint32_t curCount = node->size();
   uint32_t oldCount;
 
   while (i < curCount) {
-    MATHPRESSO_PROPAGATE(onNode(node->getAt(i)));
+    MATHPRESSO_PROPAGATE(onNode(node->childAt(i)));
 
     oldCount = curCount;
-    curCount = node->getLength();
+    curCount = node->size();
 
     if (curCount < oldCount) {
       if (!alterable)
@@ -48,7 +48,7 @@ Error AstOptimizer::onBlock(AstBlock* node) {
       continue;
     }
 
-    if (alterable && (node->getAt(i)->isImm())) {
+    if (alterable && (node->childAt(i)->isImm())) {
       _ast->deleteNode(node->removeAt(i));
       curCount--;
       continue;
@@ -61,25 +61,25 @@ Error AstOptimizer::onBlock(AstBlock* node) {
 }
 
 Error AstOptimizer::onVarDecl(AstVarDecl* node) {
-  AstSymbol* sym = node->getSymbol();
+  AstSymbol* sym = node->symbol();
 
-  if (node->hasChild()) {
-    MATHPRESSO_PROPAGATE(onNode(node->getChild()));
-    AstNode* child = node->getChild();
+  if (node->child()) {
+    MATHPRESSO_PROPAGATE(onNode(node->child()));
+    AstNode* child = node->child();
 
     if (child->isImm())
-      sym->setValue(static_cast<AstImm*>(child)->getValue());
+      sym->setValue(static_cast<AstImm*>(child)->value());
   }
 
   return kErrorOk;
 }
 
 Error AstOptimizer::onVar(AstVar* node) {
-  AstSymbol* sym = node->getSymbol();
+  AstSymbol* sym = node->symbol();
 
   if (sym->isAssigned() && !node->hasNodeFlag(kAstNodeHasSideEffect)) {
-    AstImm* imm = _ast->newNode<AstImm>(sym->getValue());
-    _ast->deleteNode(node->getParent()->replaceNode(node, imm));
+    AstImm* imm = _ast->newNode<AstImm>(sym->value());
+    _ast->deleteNode(node->parent()->replaceNode(node, imm));
   }
 
   return kErrorOk;
@@ -90,16 +90,16 @@ Error AstOptimizer::onImm(AstImm* node) {
 }
 
 Error AstOptimizer::onUnaryOp(AstUnaryOp* node) {
-  const OpInfo& op = OpInfo::get(node->getOp());
+  const OpInfo& op = OpInfo::get(node->opType());
 
-  MATHPRESSO_PROPAGATE(onNode(node->getChild()));
-  AstNode* child = node->getChild();
+  MATHPRESSO_PROPAGATE(onNode(node->child()));
+  AstNode* child = node->child();
 
   if (child->isImm()) {
-    AstImm* child = static_cast<AstImm*>(node->getChild());
-    double value = child->getValue();
+    AstImm* child = static_cast<AstImm*>(node->child());
+    double value = child->value();
 
-    switch (node->getOp()) {
+    switch (node->opType()) {
       case kOpNeg      : value = -value; break;
       case kOpNot      : value = (value == 0); break;
 
@@ -136,22 +136,22 @@ Error AstOptimizer::onUnaryOp(AstUnaryOp* node) {
       case kOpAtan     : value = mpAtan(value); break;
 
       default:
-        return _errorReporter->onError(kErrorInvalidState, node->getPosition(),
+        return _errorReporter->onError(kErrorInvalidState, node->position(),
           "Invalid unary operation '%s'.", op.name);
     }
 
     child->setValue(value);
 
     node->unlinkChild();
-    node->getParent()->replaceNode(node, child);
+    node->parent()->replaceNode(node, child);
 
     _ast->deleteNode(node);
   }
-  else if (child->getNodeType() == kAstNodeUnaryOp && node->getOp() == child->getOp()) {
+  else if (child->nodeType() == kAstNodeUnaryOp && node->opType() == child->opType()) {
     // Simplify `-(-(x))` -> `x`.
-    if (node->getOp() == kOpNeg) {
+    if (node->opType() == kOpNeg) {
       AstNode* childOfChild = static_cast<AstUnaryOp*>(child)->unlinkChild();
-      node->getParent()->replaceNode(node, childOfChild);
+      node->parent()->replaceNode(node, childOfChild);
       _ast->deleteNode(node);
     }
   }
@@ -160,19 +160,19 @@ Error AstOptimizer::onUnaryOp(AstUnaryOp* node) {
 }
 
 Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
-  const OpInfo& op = OpInfo::get(node->getOp());
+  const OpInfo& op = OpInfo::get(node->opType());
 
-  AstNode* left = node->getLeft();
-  AstNode* right = node->getRight();
+  AstNode* left = node->left();
+  AstNode* right = node->right();
 
   if (op.isAssignment())
     left->addNodeFlags(kAstNodeHasSideEffect);
 
   MATHPRESSO_PROPAGATE(onNode(left));
-  left = node->getLeft();
+  left = node->left();
 
   MATHPRESSO_PROPAGATE(onNode(right));
-  right = node->getRight();
+  right = node->right();
 
   bool lIsImm = left->isImm();
   bool rIsImm = right->isImm();
@@ -182,11 +182,11 @@ Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
     AstImm* lNode = static_cast<AstImm*>(left);
     AstImm* rNode = static_cast<AstImm*>(right);
 
-    double lVal = lNode->getValue();
-    double rVal = rNode->getValue();
+    double lVal = lNode->value();
+    double rVal = rNode->value();
     double result = 0.0;
 
-    switch (node->getOp()) {
+    switch (node->opType()) {
       case kOpEq      : result = lVal == rVal; break;
       case kOpNe      : result = lVal != rVal; break;
       case kOpLt      : result = lVal < rVal; break;
@@ -207,36 +207,36 @@ Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
       case kOpCopySign: result = mpCopySign(lVal, rVal); break;
 
       default:
-        return _errorReporter->onError(kErrorInvalidState, node->getPosition(),
+        return _errorReporter->onError(kErrorInvalidState, node->position(),
           "Invalid binary operation '%s'.", op.name);
     }
 
     lNode->setValue(result);
     node->unlinkLeft();
-    node->getParent()->replaceNode(node, lNode);
+    node->parent()->replaceNode(node, lNode);
 
     _ast->deleteNode(node);
   }
   // There is still a little optimization opportunity.
   else if (lIsImm) {
     AstImm* lNode = static_cast<AstImm*>(left);
-    double val = lNode->getValue();
+    double val = lNode->value();
 
     if ((val == 0.0 && (op.flags & kOpFlagNopIfLZero)) ||
         (val == 1.0 && (op.flags & kOpFlagNopIfLOne))) {
       node->unlinkRight();
-      node->getParent()->replaceNode(node, right);
+      node->parent()->replaceNode(node, right);
 
       _ast->deleteNode(node);
     }
   }
   else if (rIsImm) {
     AstImm* rNode = static_cast<AstImm*>(right);
-    double val = rNode->getValue();
+    double val = rNode->value();
 
     // Evaluate an assignment.
     if (op.isAssignment() && left->isVar()) {
-      AstSymbol* sym = static_cast<AstVar*>(left)->getSymbol();
+      AstSymbol* sym = static_cast<AstVar*>(left)->symbol();
       if (op.type == kOpAssign || sym->isAssigned()) {
         sym->setValue(val);
         sym->setAssigned();
@@ -246,7 +246,7 @@ Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
       if ((val == 0.0 && (op.flags & kOpFlagNopIfRZero)) ||
           (val == 1.0 && (op.flags & kOpFlagNopIfROne))) {
         node->unlinkLeft();
-        node->getParent()->replaceNode(node, left);
+        node->parent()->replaceNode(node, left);
 
         _ast->deleteNode(node);
       }
@@ -257,22 +257,22 @@ Error AstOptimizer::onBinaryOp(AstBinaryOp* node) {
 }
 
 Error AstOptimizer::onCall(AstCall* node) {
-  AstSymbol* sym = node->getSymbol();
-  uint32_t i, count = node->getLength();
+  AstSymbol* sym = node->symbol();
+  uint32_t i, count = node->size();
 
   bool allConst = true;
   for (i = 0; i < count; i++) {
-    MATHPRESSO_PROPAGATE(onNode(node->getAt(i)));
-    allConst &= node->getAt(i)->isImm();
+    MATHPRESSO_PROPAGATE(onNode(node->childAt(i)));
+    allConst &= node->childAt(i)->isImm();
   }
 
   if (allConst && count <= 8) {
-    AstImm** args = reinterpret_cast<AstImm**>(node->getChildren());
+    AstImm** args = reinterpret_cast<AstImm**>(node->children());
 
-    void* fn = sym->getFuncPtr();
+    void* fn = sym->funcPtr();
     double result = 0.0;
 
-#define ARG(n) args[n]->getValue()
+    #define ARG(n) args[n]->value()
     switch (count) {
       case 0: result = ((Arg0Func)fn)(); break;
       case 1: result = ((Arg1Func)fn)(ARG(0)); break;
@@ -284,10 +284,10 @@ Error AstOptimizer::onCall(AstCall* node) {
       case 7: result = ((Arg7Func)fn)(ARG(0), ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), ARG(6)); break;
       case 8: result = ((Arg8Func)fn)(ARG(0), ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), ARG(6), ARG(7)); break;
     }
-#undef ARG
+    #undef ARG
 
     AstNode* replacement = _ast->newNode<AstImm>(result);
-    node->getParent()->replaceNode(node, replacement);
+    node->parent()->replaceNode(node, replacement);
     _ast->deleteNode(node);
   }
 

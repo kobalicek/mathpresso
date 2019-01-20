@@ -12,8 +12,10 @@
 #include "./mathpresso.h"
 #include <asmjit/asmjit.h>
 
-#include <stdarg.h>
+#include <limits.h>
 #include <math.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,45 +66,6 @@
 # define MATHPRESSO_ARCH_64BIT        (MATHPRESSO_ARCH_ARM64)
 # define MATHPRESSO_ARCH_BE           (0)
 # define MATHPRESSO_ARCH_LE           (1)
-#endif
-
-// ============================================================================
-// [mathpresso::StdInt]
-// ============================================================================
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-# include <sys/types.h>
-#endif
-#if defined(_MSC_VER) && (_MSC_VER < 1600)
-# include <limits.h>
-# if !defined(MATHPRESSO_SUPPRESS_STD_TYPES)
-#  if (_MSC_VER < 1300)
-typedef signed char      int8_t;
-typedef signed short     int16_t;
-typedef signed int       int32_t;
-typedef signed __int64   int64_t;
-typedef unsigned char    uint8_t;
-typedef unsigned short   uint16_t;
-typedef unsigned int     uint32_t;
-typedef unsigned __int64 uint64_t;
-#  else
-typedef __int8           int8_t;
-typedef __int16          int16_t;
-typedef __int32          int32_t;
-typedef __int64          int64_t;
-typedef unsigned __int8  uint8_t;
-typedef unsigned __int16 uint16_t;
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-#  endif
-# endif
-# define MATHPRESSO_INT64_C(x) (x##i64)
-# define MATHPRESSO_UINT64_C(x) (x##ui64)
-#else
-# include <stdint.h>
-# include <limits.h>
-# define MATHPRESSO_INT64_C(x) (x##ll)
-# define MATHPRESSO_UINT64_C(x) (x##ull)
 #endif
 
 // ============================================================================
@@ -180,12 +143,12 @@ namespace mathpresso {
 // ============================================================================
 
 // Reuse these classes - we depend on asmjit anyway and these are internal.
-using asmjit::StringBuilder;
-using asmjit::StringBuilderTmp;
+using asmjit::String;
+using asmjit::StringTmp;
 
 using asmjit::Zone;
-using asmjit::ZoneHeap;
 using asmjit::ZoneVector;
+using asmjit::ZoneAllocator;
 
 // ============================================================================
 // [mathpresso::OpType]
@@ -299,7 +262,7 @@ enum OpFlags {
 // ============================================================================
 
 enum InternalConsts {
-  kInvalidSlot = 0xFFFFFFFFU
+  kInvalidSlot = 0xFFFFFFFFu
 };
 
 // ============================================================================
@@ -347,7 +310,7 @@ struct OpInfo {
 
   MATHPRESSO_INLINE bool isUnary() const { return (flags & kOpFlagUnary) != 0; }
   MATHPRESSO_INLINE bool isBinary() const { return (flags & kOpFlagBinary) != 0; }
-  MATHPRESSO_INLINE uint32_t getOpCount() const { return 1 + ((flags & kOpFlagBinary) != 0); }
+  MATHPRESSO_INLINE uint32_t opCount() const { return 1 + ((flags & kOpFlagBinary) != 0); }
 
   MATHPRESSO_INLINE bool isIntrinsic() const { return (flags & kOpFlagIntrinsic) != 0; }
 
@@ -387,11 +350,11 @@ MATHPRESSO_INLINE const OpInfo& OpInfo::get(uint32_t op) {
 // [mathpresso::StringRef]
 // ============================================================================
 
-//! String reference (pointer to string data data and length).
+//! String reference (pointer to string data data and size).
 //!
-//! NOTE: MATHPRESSO always provides NULL terminated string with length known. On the
-//! other hand MATHPRESSO doesn't require NULL terminated strings when passed to MATHPRESSO
-//! APIs.
+//! \note MATHPRESSO always provides NULL terminated string with size known. On
+//! the other hand MATHPRESSO doesn't require NULL terminated strings when passed
+//! to MATHPRESSO APIs.
 struct StringRef {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -399,15 +362,15 @@ struct StringRef {
 
   MATHPRESSO_INLINE StringRef()
     : _data(NULL),
-      _length(0) {}
+      _size(0) {}
 
   explicit MATHPRESSO_INLINE StringRef(const char* data)
     : _data(data),
-      _length(::strlen(data)) {}
+      _size(::strlen(data)) {}
 
-  MATHPRESSO_INLINE StringRef(const char* data, size_t len)
+  MATHPRESSO_INLINE StringRef(const char* data, size_t size)
     : _data(data),
-      _length(len) {}
+      _size(size) {}
 
   // --------------------------------------------------------------------------
   // [Reset / Setup]
@@ -417,13 +380,13 @@ struct StringRef {
     set(NULL, 0);
   }
 
-  MATHPRESSO_INLINE void set(const char* s) {
-    set(s, ::strlen(s));
+  MATHPRESSO_INLINE void set(const char* data) {
+    set(data, ::strlen(data));
   }
 
-  MATHPRESSO_INLINE void set(const char* s, size_t len) {
-    _data = s;
-    _length = len;
+  MATHPRESSO_INLINE void set(const char* data, size_t size) {
+    _data = data;
+    _size = size;
   }
 
   // --------------------------------------------------------------------------
@@ -431,9 +394,9 @@ struct StringRef {
   // --------------------------------------------------------------------------
 
   //! Get the string data.
-  MATHPRESSO_INLINE const char* getData() const { return _data; }
-  //! Get the string length.
-  MATHPRESSO_INLINE size_t getLength() const { return _length; }
+  MATHPRESSO_INLINE const char* data() const { return _data; }
+  //! Get the string size.
+  MATHPRESSO_INLINE size_t size() const { return _size; }
 
   // --------------------------------------------------------------------------
   // [Eq]
@@ -441,7 +404,7 @@ struct StringRef {
 
   MATHPRESSO_INLINE bool eq(const char* s) const {
     const char* a = _data;
-    const char* aEnd = a + _length;
+    const char* aEnd = a + _size;
 
     while (a != aEnd) {
       if (*a++ != *s++)
@@ -451,8 +414,8 @@ struct StringRef {
     return *s == '\0';
   }
 
-  MATHPRESSO_INLINE bool eq(const char* s, size_t len) const {
-    return len == _length && ::memcmp(_data, s, len) == 0;
+  MATHPRESSO_INLINE bool eq(const char* s, size_t size) const {
+    return size == _size && ::memcmp(_data, s, size) == 0;
   }
 
   // --------------------------------------------------------------------------
@@ -460,7 +423,7 @@ struct StringRef {
   // --------------------------------------------------------------------------
 
   const char* _data;
-  size_t _length;
+  size_t _size;
 };
 
 // ============================================================================
@@ -469,9 +432,9 @@ struct StringRef {
 
 //! Error reporter.
 struct ErrorReporter {
-  MATHPRESSO_INLINE ErrorReporter(const char* body, size_t len, uint32_t options, OutputLog* log)
+  MATHPRESSO_INLINE ErrorReporter(const char* body, size_t size, uint32_t options, OutputLog* log)
     : _body(body),
-      _len(len),
+      _size(size),
       _options(options),
       _log(log) {
 
@@ -490,17 +453,17 @@ struct ErrorReporter {
   void getLineAndColumn(uint32_t position, uint32_t& line, uint32_t& column);
 
   void onWarning(uint32_t position, const char* fmt, ...);
-  void onWarning(uint32_t position, const StringBuilder& msg);
+  void onWarning(uint32_t position, const String& msg);
 
   Error onError(Error error, uint32_t position, const char* fmt, ...);
-  Error onError(Error error, uint32_t position, const StringBuilder& msg);
+  Error onError(Error error, uint32_t position, const String& msg);
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
   const char* _body;
-  size_t _len;
+  size_t _size;
 
   uint32_t _options;
   OutputLog* _log;

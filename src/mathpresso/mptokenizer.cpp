@@ -5,7 +5,7 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Export]
-#define MATHPRESSO_EXPORTS
+#define MATHPRESSO_BUILD_EXPORT
 
 // [Dependencies]
 #include "./mpeval_p.h"
@@ -137,16 +137,16 @@ enum {
 
 //! \internal
 //!
-//! Converts a given symbol `s` of `sLen` to a keyword token.
-static uint32_t mpGetKeyword(const uint8_t* s, size_t sLen) {
-  if (sLen == 3 && s[0] == 'v' && s[1] == 'a' && s[2] == 'r')
+//! Converts a given symbol `s` of `size` to a keyword token.
+static uint32_t mpGetKeyword(const uint8_t* s, size_t size) {
+  if (size == 3 && s[0] == 'v' && s[1] == 'a' && s[2] == 'r')
     return kTokenVar;
 
   return kTokenSymbol;
 }
 
 uint32_t Tokenizer::peek(Token* token) {
-  uint32_t uToken = _token.token;
+  uint32_t uToken = _token._tokenType;
   if (uToken != kTokenInvalid || (uToken = next(&_token)) != kTokenInvalid)
     *token = _token;
   return uToken;
@@ -154,12 +154,12 @@ uint32_t Tokenizer::peek(Token* token) {
 
 uint32_t Tokenizer::next(Token* token) {
   // Skip parsing if the next token is already done, caused by `peek()`.
-  uint32_t c = _token.token;
-  uint32_t hVal;
+  uint32_t c = _token._tokenType;
+  uint32_t hashCode;
 
   if (c != kTokenInvalid) {
     *token = _token;
-    _token.token = kTokenInvalid;
+    _token._tokenType = kTokenInvalid;
     return c;
   }
 
@@ -179,8 +179,8 @@ _Repeat:
     if (p == pEnd)
       goto _EndOfInput;
 
-    hVal = p[0];
-    c = mpCharClass[hVal];
+    hashCode = p[0];
+    c = mpCharClass[hashCode];
 
     if (c != kTokenCharSpc)
       break;
@@ -266,7 +266,7 @@ _Repeat:
           goto _Invalid;
 
       uint32_t e = 0;
-      size_t eLen = 0;
+      size_t expSize = 0;
 
       do {
         c = static_cast<uint32_t>(p[0]) - static_cast<uint32_t>('0');
@@ -274,19 +274,19 @@ _Repeat:
           break;
 
         e = e * 10 + c;
-        eLen++;
+        expSize++;
       } while (++p != pEnd);
 
       // Error if there is no number after the 'e' token.
-      if (eLen == 0)
+      if (expSize == 0)
         goto _Invalid;
 
       // If less than 10 digits it's safe to assume the exponent is zero if
       // `e` is zero. Otherwise it could have overflown the 32-bit integer.
-      if (e == 0 && eLen < 10)
-        eLen = 0; // No exponent.
+      if (e == 0 && expSize < 10)
+        expSize = 0; // No exponent.
 
-      if (eLen <= 6)
+      if (expSize <= 6)
         exponent += negative ? -static_cast<int>(e) : static_cast<int>(e);
       else
         safe = false;
@@ -298,7 +298,7 @@ _Repeat:
 
     // Limit a range of safe values from Xe-15 to Xe15.
     safe = safe && exponent >= -kPow10TableSize && exponent <= kPow10TableSize;
-    size_t len = (size_t)(p - pToken);
+    size_t size = (size_t)(p - pToken);
 
     if (safe) {
       if (exponent != 0)
@@ -309,11 +309,11 @@ _Repeat:
       char tmp[512];
       char* buf = tmp;
 
-      if (len >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(len + 1))) == NULL)
+      if (size >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(size + 1))) == NULL)
         return kTokenInvalid;
 
-      memcpy(buf, pToken, len);
-      buf[len] = '\0';
+      memcpy(buf, pToken, size);
+      buf[size] = '\0';
 
       val = _strtod.conv(buf, NULL);
 
@@ -321,8 +321,8 @@ _Repeat:
         ::free(buf);
     }
 
-    token->value = val;
-    token->setData((size_t)(pToken - pStart), len, 0, kTokenNumber);
+    token->_value = val;
+    token->setData((size_t)(pToken - pStart), size, 0, kTokenNumber);
 
     _p = reinterpret_cast<const char*>(p);
     return kTokenNumber;
@@ -333,18 +333,18 @@ _Repeat:
   // --------------------------------------------------------------------------
 
   else if (c <= kTokenCharSym) {
-    // We always generate the hVal during tokenization to improve performance.
+    // We always calculate hashCode during tokenization to improve performance.
     while (++p != pEnd) {
       uint32_t ord = p[0];
       c = mpCharClass[ord];
       if (c > kTokenCharSym)
         break;
-      hVal = HashUtils::hashChar(hVal, ord);
+      hashCode = HashUtils::hashChar(hashCode, ord);
     }
 
-    size_t len = (size_t)(p - pToken);
+    size_t size = (size_t)(p - pToken);
     _p = reinterpret_cast<const char*>(p);
-    return token->setData((size_t)(pToken - pStart), len, hVal, mpGetKeyword(pToken, len));
+    return token->setData((size_t)(pToken - pStart), size, hashCode, mpGetKeyword(pToken, size));
   }
 
   // --------------------------------------------------------------------------

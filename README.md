@@ -6,16 +6,18 @@ Mathematical Expression Parser And JIT Compiler.
   * [Official Repository (kobalicek/mathpresso)](https://github.com/kobalicek/mathpresso)
   * [Official Blog (asmbits)] (https://asmbits.blogspot.com/ncr)
   * [Official Chat (gitter)](https://gitter.im/kobalicek/mpsl)
-  * [Permissive ZLIB license](./LICENSE.md)
+  * [Permissive Zlib license](./LICENSE.md)
+
 
 Introduction
 ------------
-  
+
 MathPresso is a C++ library designed to parse mathematical expressions and compile them into machine code. It's much faster than traditional AST or byte-code based evaluators, because there is basically no overhead in the expression's execution. The JIT compiler is based on AsmJit and works on X86 and X64 architectures.
 
 This is an updated version of MathPresso that uses a stripped-off MPSL engine designed to work with scalar double precision floating points. It has many bugs fixed compared to the last version on google-code and contains improvements that can make execution of certain built-in functions (intrinsics) faster if the host CPU supports SSE4.1 (rounding, fraction, modulo, etc...).
 
 This is also a transitional version that is available to users that want to use MathPresso and cannot wait for the new MPSL engine, which is a work in progress.
+
 
 Features
 --------
@@ -75,6 +77,7 @@ Features
     * Not a Number `NaN`
     * Euler's constant `E = 2.7182818284590452354`
     * PI `PI = 3.14159265358979323846`
+
 
 Usage
 -----
@@ -166,6 +169,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
+
 Error Handling
 --------------
 
@@ -197,7 +201,7 @@ struct Data {
 struct MyOutputLog : public mathpresso::OutputLog {
   MyOutputLog() {}
   virtual ~MyOutputLog() {}
-  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
     switch (type) {
       case kMessageError:
         printf("[ERROR]: %s (line %u, column %u)\n", message, line, column);
@@ -238,10 +242,10 @@ int main(int argc, char* argv[]) {
 
   // The following options will cause that MathPresso will send everything
   // it does to `OutputLog`.
-  unsigned int options = 
-    mathpresso::kOptionVerbose  | // Enable warnings, not just errors.
-    mathpresso::kOptionDebugAst | // Enable AST dumps.
-    mathpresso::kOptionDebugAsm ; // Enable ASM dumps.
+  unsigned int options =
+    mathpresso::kOptionVerbose         | // Enable warnings, not just errors.
+    mathpresso::kOptionDebugAst        | // Enable AST dumps.
+    mathpresso::kOptionDebugMachineCode; // Enable ASM dumps.
 
   mathpresso::Expression exp;
   mathpresso::Error err = exp.compile(ctx,
@@ -319,17 +323,26 @@ L2:                                 ;                     |
 RESULT: -1885.514400
 ```
 
+
 Dependencies
 ------------
 
-  * AsmJit - 1.0 or later.
+  * AsmJit
+
 
 Support
 -------
 
-Please consider a donation if you use the project and would like to keep it active in the future.
+MathPresso is an open-source library released under a permissive ZLIB license, which makes it possible to use it freely in any open-source or commercial product. Free support is available through issues and gitter channel.
 
-  * [Donate by PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=QDRM6SRNG7378&lc=EN;&item_name=mathpresso&currency_code=EUR)
+If you use MathPresso in a non-commercial project and would like to appreciate the library in the form of a donation you are welcome to support us. Donations are anonymous unless the donor lets us know otherwise. The order and format of listed donors is not guaranteed and may change in the future. Additionally, donations should be considered as an appreciation of past work and not used to gain special privileges in terms of future development. MathPresso authors reserve the right to remove a donor from the list in extreme cases of disruptive behavior against other community members. Diversity of opinions and constructive criticism will always be welcome in the MathPresso community.
+
+Donation Addresses:
+
+  * BTC: 14dEp5h8jYSxgXB9vcjE8eh78uweD76o7W
+  * ETH: 0xd4f0b9424cF31DF5a5359D029CF3A65c500a581E
+  * Please contact us if you would like to donate through a different channel or to use a different crypto-currency. Wire transfers and SEPA payments are both possible.
+
 
 Authors & Maintainers
 ---------------------

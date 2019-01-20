@@ -5,7 +5,7 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Export]
-#define MATHPRESSO_EXPORTS
+#define MATHPRESSO_BUILD_EXPORT
 
 // [Dependencies]
 #include "./mpast_p.h"
@@ -21,8 +21,8 @@ struct AstNodeSize {
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE uint32_t getNodeType() const { return _nodeType; }
-  MATHPRESSO_INLINE uint32_t getNodeSize() const { return _nodeSize; }
+  MATHPRESSO_INLINE uint32_t nodeType() const { return _nodeType; }
+  MATHPRESSO_INLINE uint32_t nodeSize() const { return _nodeSize; }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -51,8 +51,8 @@ static const AstNodeSize mpAstNodeSize[] = {
 // [mathpresso::AstBuilder - Construction / Destruction]
 // ============================================================================
 
-AstBuilder::AstBuilder(ZoneHeap* heap)
-  : _heap(heap),
+AstBuilder::AstBuilder(ZoneAllocator* allocator)
+  : _allocator(allocator),
     _rootScope(NULL),
     _programNode(NULL),
     _numSlots(0) {}
@@ -63,7 +63,7 @@ AstBuilder::~AstBuilder() {}
 // ============================================================================
 
 AstScope* AstBuilder::newScope(AstScope* parent, uint32_t scopeType) {
-  void* p = _heap->alloc(sizeof(AstScope));
+  void* p = _allocator->alloc(sizeof(AstScope));
   if (p == NULL)
     return NULL;
   return new(p) AstScope(this, parent, scopeType);
@@ -71,26 +71,26 @@ AstScope* AstBuilder::newScope(AstScope* parent, uint32_t scopeType) {
 
 void AstBuilder::deleteScope(AstScope* scope) {
   scope->~AstScope();
-  _heap->release(scope, sizeof(AstScope));
+  _allocator->release(scope, sizeof(AstScope));
 }
 
-AstSymbol* AstBuilder::newSymbol(const StringRef& key, uint32_t hVal, uint32_t symbolType, uint32_t scopeType) {
-  size_t kLen = key.getLength();
-  void* p = _heap->alloc(sizeof(AstSymbol) + kLen + 1);
+AstSymbol* AstBuilder::newSymbol(const StringRef& key, uint32_t hashCode, uint32_t symbolType, uint32_t scopeType) {
+  size_t keySize = key.size();
+  void* p = _allocator->alloc(sizeof(AstSymbol) + keySize + 1);
 
   if (p == NULL)
     return NULL;
 
-  char* kStr = static_cast<char*>(p) + sizeof(AstSymbol);
-  ::memcpy(kStr, key.getData(), kLen);
+  char* keyData = static_cast<char*>(p) + sizeof(AstSymbol);
+  ::memcpy(keyData, key.data(), keySize);
 
-  kStr[kLen] = '\0';
-  return new(p) AstSymbol(kStr, static_cast<uint32_t>(kLen), hVal, symbolType, scopeType);
+  keyData[keySize] = '\0';
+  return new(p) AstSymbol(keyData, static_cast<uint32_t>(keySize), hashCode, symbolType, scopeType);
 }
 
 AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
-  StringRef name(other->getName(), other->getLength());
-  AstSymbol* sym = newSymbol(name, other->getHVal(), other->getSymbolType(), kAstScopeShadow);
+  StringRef name(other->name(), other->nameSize());
+  AstSymbol* sym = newSymbol(name, other->hashCode(), other->symbolType(), kAstScopeShadow);
 
   if (sym == NULL)
     return NULL;
@@ -98,7 +98,7 @@ AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
   sym->_opType = other->_opType;
   sym->_symbolFlags = other->_symbolFlags;
 
-  switch (sym->getSymbolType()) {
+  switch (sym->symbolType()) {
     case kAstSymbolVariable: {
       sym->_varSlotId = other->_varSlotId;
       sym->_varOffset = other->_varOffset;
@@ -117,17 +117,17 @@ AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
 }
 
 void AstBuilder::deleteSymbol(AstSymbol* symbol) {
-  size_t kLen = symbol->getLength();
+  size_t keySize = symbol->nameSize();
   symbol->~AstSymbol();
-  _heap->release(symbol, sizeof(AstSymbol) + kLen + 1);
+  _allocator->release(symbol, sizeof(AstSymbol) + keySize + 1);
 }
 
 void AstBuilder::deleteNode(AstNode* node) {
-  uint32_t length = node->getLength();
-  AstNode** children = node->getChildren();
+  uint32_t size = node->size();
+  AstNode** children = node->children();
 
-  uint32_t nodeType = node->getNodeType();
-  MATHPRESSO_ASSERT(mpAstNodeSize[nodeType].getNodeType() == nodeType);
+  uint32_t nodeType = node->nodeType();
+  MATHPRESSO_ASSERT(mpAstNodeSize[nodeType].nodeType() == nodeType);
 
   switch (nodeType) {
     case kAstNodeProgram  : static_cast<AstProgram*  >(node)->destroy(this); break;
@@ -140,13 +140,13 @@ void AstBuilder::deleteNode(AstNode* node) {
     case kAstNodeCall     : static_cast<AstCall*     >(node)->destroy(this); break;
   }
 
-  for (uint32_t i = 0; i < length; i++) {
+  for (uint32_t i = 0; i < size; i++) {
     AstNode* child = children[i];
     if (child != NULL)
       deleteNode(child);
   }
 
-  _heap->release(node, mpAstNodeSize[nodeType].getNodeSize());
+  _allocator->release(node, mpAstNodeSize[nodeType].nodeSize());
 }
 
 // ============================================================================
@@ -171,8 +171,8 @@ Error AstBuilder::initProgramScope() {
 // [mathpresso::AstBuilder - Dump]
 // ============================================================================
 
-Error AstBuilder::dump(StringBuilder& sb) {
-  return AstDump(this, sb).onProgram(getProgramNode());
+Error AstBuilder::dump(String& sb) {
+  return AstDump(this, sb).onProgram(programNode());
 }
 
 // ============================================================================
@@ -189,7 +189,7 @@ struct AstScopeReleaseHandler {
 AstScope::AstScope(AstBuilder* ast, AstScope* parent, uint32_t scopeType)
   : _ast(ast),
     _parent(parent),
-    _symbols(ast->getHeap()),
+    _symbols(ast->allocator()),
     _scopeType(static_cast<uint8_t>(scopeType)) {}
 
 AstScope::~AstScope() {
@@ -201,13 +201,13 @@ AstScope::~AstScope() {
 // [mathpresso::AstScope - Ops]
 // ============================================================================
 
-AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hVal, AstScope** scopeOut) {
+AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hashCode, AstScope** scopeOut) {
   AstScope* scope = this;
   AstSymbol* symbol;
 
   do {
-    symbol = scope->_symbols.get(name, hVal);
-  } while (symbol == NULL && (scope = scope->getParent()) != NULL);
+    symbol = scope->_symbols.get(name, hashCode);
+  } while (symbol == NULL && (scope = scope->parent()) != NULL);
 
   if (scopeOut != NULL)
     *scopeOut = scope;
@@ -221,13 +221,13 @@ AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hVal, AstScop
 
 AstNode* AstNode::replaceNode(AstNode* refNode, AstNode* node) {
   MATHPRESSO_ASSERT(refNode != NULL);
-  MATHPRESSO_ASSERT(refNode->getParent() == this);
+  MATHPRESSO_ASSERT(refNode->parent() == this);
   MATHPRESSO_ASSERT(node == NULL || !node->hasParent());
 
-  uint32_t length = _length;
-  AstNode** children = getChildren();
+  uint32_t size = _size;
+  AstNode** children = _children;
 
-  for (uint32_t i = 0; i < length; i++) {
+  for (uint32_t i = 0; i < size; i++) {
     AstNode* child = children[i];
 
     if (child != refNode)
@@ -246,7 +246,7 @@ AstNode* AstNode::replaceNode(AstNode* refNode, AstNode* node) {
 }
 
 AstNode* AstNode::replaceAt(uint32_t index, AstNode* node) {
-  AstNode* child = getAt(index);
+  AstNode* child = childAt(index);
   _children[index] = node;
 
   if (child != NULL)
@@ -259,13 +259,13 @@ AstNode* AstNode::replaceAt(uint32_t index, AstNode* node) {
 }
 
 AstNode* AstNode::injectNode(AstNode* refNode, AstUnary* node) {
-  MATHPRESSO_ASSERT(refNode != NULL && refNode->getParent() == this);
-  MATHPRESSO_ASSERT(node != NULL && node->getParent() == NULL);
+  MATHPRESSO_ASSERT(refNode != NULL && refNode->parent() == this);
+  MATHPRESSO_ASSERT(node != NULL && node->parent() == NULL);
 
-  uint32_t length = _length;
-  AstNode** children = getChildren();
+  uint32_t size = _size;
+  AstNode** children = _children;
 
-  for (uint32_t i = 0; i < length; i++) {
+  for (uint32_t i = 0; i < size; i++) {
     AstNode* child = children[i];
 
     if (child != refNode)
@@ -284,9 +284,9 @@ AstNode* AstNode::injectNode(AstNode* refNode, AstUnary* node) {
 }
 
 AstNode* AstNode::injectAt(uint32_t index, AstUnary* node) {
-  AstNode* child = getAt(index);
+  AstNode* child = childAt(index);
 
-  MATHPRESSO_ASSERT(node != NULL && node->getParent() == NULL);
+  MATHPRESSO_ASSERT(node != NULL && node->parent() == NULL);
   MATHPRESSO_ASSERT(child != NULL);
 
   _children[index] = node;
@@ -306,8 +306,8 @@ static Error mpBlockNodeGrow(AstBlock* self) {
   size_t oldCapacity = self->_capacity;
   size_t newCapacity = oldCapacity;
 
-  size_t length = self->_length;
-  MATHPRESSO_ASSERT(oldCapacity == length);
+  size_t size = self->_size;
+  MATHPRESSO_ASSERT(oldCapacity == size);
 
   // Grow, we prefer growing quickly until we reach 128 and then 1024 nodes. We
   // don't expect to reach these limits in the most used expressions; only test
@@ -324,10 +324,10 @@ static Error mpBlockNodeGrow(AstBlock* self) {
   else
     newCapacity += 256;
 
-  ZoneHeap* heap = self->getAst()->getHeap();
+  ZoneAllocator* allocator = self->ast()->allocator();
 
-  AstNode** oldArray = self->getChildren();
-  AstNode** newArray = static_cast<AstNode**>(heap->alloc(newCapacity * sizeof(AstNode), newCapacity));
+  AstNode** oldArray = self->children();
+  AstNode** newArray = static_cast<AstNode**>(allocator->alloc(newCapacity * sizeof(AstNode), newCapacity));
 
   MATHPRESSO_NULLCHECK(newArray);
   newCapacity /= sizeof(AstNode*);
@@ -336,8 +336,8 @@ static Error mpBlockNodeGrow(AstBlock* self) {
   self->_capacity = static_cast<uint32_t>(newCapacity);
 
   if (oldCapacity != 0) {
-    ::memcpy(newArray, oldArray, length * sizeof(AstNode*));
-    heap->release(oldArray, oldCapacity * sizeof(AstNode*));
+    ::memcpy(newArray, oldArray, size * sizeof(AstNode*));
+    allocator->release(oldArray, oldCapacity * sizeof(AstNode*));
   }
 
   return kErrorOk;
@@ -345,17 +345,17 @@ static Error mpBlockNodeGrow(AstBlock* self) {
 
 Error AstBlock::willAdd() {
   // Grow if needed.
-  if (_length == _capacity)
+  if (_size == _capacity)
     MATHPRESSO_PROPAGATE(mpBlockNodeGrow(this));
   return kErrorOk;
 }
 
 AstNode* AstBlock::removeNode(AstNode* node) {
   MATHPRESSO_ASSERT(node != NULL);
-  MATHPRESSO_ASSERT(node->getParent() == this);
+  MATHPRESSO_ASSERT(node->parent() == this);
 
-  AstNode** p = getChildren();
-  AstNode** pEnd = p + _length;
+  AstNode** p = children();
+  AstNode** pEnd = p + _size;
 
   while (p != pEnd) {
     if (p[0] == node)
@@ -369,7 +369,7 @@ AstNode* AstBlock::removeNode(AstNode* node) {
   return NULL;
 
 _Found:
-  _length--;
+  _size--;
   ::memmove(p, p + 1, static_cast<size_t>(pEnd - p - 1) * sizeof(AstNode*));
 
   node->_parent = NULL;
@@ -377,16 +377,16 @@ _Found:
 }
 
 AstNode* AstBlock::removeAt(uint32_t index) {
-  MATHPRESSO_ASSERT(index < _length);
+  MATHPRESSO_ASSERT(index < _size);
 
-  if (index >= _length)
+  if (index >= _size)
     return NULL;
 
-  AstNode** p = getChildren() + index;
+  AstNode** p = children() + index;
   AstNode* oldNode = p[0];
 
-  _length--;
-  ::memmove(p, p + 1, static_cast<size_t>(_length - index) * sizeof(AstNode*));
+  _size--;
+  ::memmove(p, p + 1, static_cast<size_t>(_size - index) * sizeof(AstNode*));
 
   oldNode->_parent = NULL;
   return oldNode;
@@ -405,7 +405,7 @@ AstVisitor::~AstVisitor() {}
 // ============================================================================
 
 Error AstVisitor::onNode(AstNode* node) {
-  switch (node->getNodeType()) {
+  switch (node->nodeType()) {
     case kAstNodeProgram  : return onProgram  (static_cast<AstProgram*  >(node));
     case kAstNodeBlock    : return onBlock    (static_cast<AstBlock*    >(node));
     case kAstNodeVarDecl  : return onVarDecl  (static_cast<AstVarDecl*  >(node));
@@ -428,7 +428,7 @@ Error AstVisitor::onProgram(AstProgram* node) {
 // [mathpresso::AstDump - Construction / Destruction]
 // ============================================================================
 
-AstDump::AstDump(AstBuilder* ast, StringBuilder& sb)
+AstDump::AstDump(AstBuilder* ast, String& sb)
   : AstVisitor(ast),
     _sb(sb),
     _level(0) {}
@@ -439,27 +439,27 @@ AstDump::~AstDump() {}
 // ============================================================================
 
 Error AstDump::onBlock(AstBlock* node) {
-  AstNode** children = node->getChildren();
-  uint32_t i, count = node->getLength();
+  AstNode** children = node->children();
+  uint32_t i, size = node->size();
 
-  for (i = 0; i < count; i++)
+  for (i = 0; i < size; i++)
     onNode(children[i]);
 
   return kErrorOk;
 }
 
 Error AstDump::onVarDecl(AstVarDecl* node) {
-  AstSymbol* sym = node->getSymbol();
+  AstSymbol* sym = node->symbol();
 
-  nest("%s [VarDecl]", sym ? sym->getName() : static_cast<const char*>(NULL));
-  if (node->hasChild())
-    MATHPRESSO_PROPAGATE(onNode(node->getChild()));
+  nest("%s [VarDecl]", sym ? sym->name() : static_cast<const char*>(NULL));
+  if (node->child())
+    MATHPRESSO_PROPAGATE(onNode(node->child()));
   return denest();
 }
 
 Error AstDump::onVar(AstVar* node) {
-  AstSymbol* sym = node->getSymbol();
-  return info("%s", sym ? sym->getName() : static_cast<const char*>(NULL));
+  AstSymbol* sym = node->symbol();
+  return info("%s", sym ? sym->name() : static_cast<const char*>(NULL));
 }
 
 Error AstDump::onImm(AstImm* node) {
@@ -467,25 +467,25 @@ Error AstDump::onImm(AstImm* node) {
 }
 
 Error AstDump::onUnaryOp(AstUnaryOp* node) {
-  nest("%s [Unary]", OpInfo::get(node->getOp()).name);
-  if (node->hasChild())
-    MATHPRESSO_PROPAGATE(onNode(node->getChild()));
+  nest("%s [Unary]", OpInfo::get(node->opType()).name);
+  if (node->child())
+    MATHPRESSO_PROPAGATE(onNode(node->child()));
   return denest();
 }
 
 Error AstDump::onBinaryOp(AstBinaryOp* node) {
-  nest("%s [Binary]", OpInfo::get(node->getOp()).name);
-  if (node->hasLeft())
-    MATHPRESSO_PROPAGATE(onNode(node->getLeft()));
-  if (node->hasRight())
-    MATHPRESSO_PROPAGATE(onNode(node->getRight()));
+  nest("%s [Binary]", OpInfo::get(node->opType()).name);
+  if (node->left())
+    MATHPRESSO_PROPAGATE(onNode(node->left()));
+  if (node->right())
+    MATHPRESSO_PROPAGATE(onNode(node->right()));
   return denest();
 }
 
 Error AstDump::onCall(AstCall* node) {
-  AstSymbol* sym = node->getSymbol();
+  AstSymbol* sym = node->symbol();
 
-  nest("%s()", sym ? sym->getName() : static_cast<const char*>(NULL));
+  nest("%s()", sym ? sym->name() : static_cast<const char*>(NULL));
   onBlock(node);
   return denest();
 }
@@ -499,7 +499,7 @@ Error AstDump::info(const char* fmt, ...) {
   va_start(ap, fmt);
 
   _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
-  _sb.appendFormatVA(fmt, ap);
+  _sb.appendVFormat(fmt, ap);
   _sb.appendChar('\n');
 
   va_end(ap);
@@ -511,7 +511,7 @@ Error AstDump::nest(const char* fmt, ...) {
   va_start(ap, fmt);
 
   _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
-  _sb.appendFormatVA(fmt, ap);
+  _sb.appendVFormat(fmt, ap);
   _sb.appendChar('\n');
 
   va_end(ap);

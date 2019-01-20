@@ -106,46 +106,47 @@ struct Token {
   // --------------------------------------------------------------------------
 
   MATHPRESSO_INLINE void reset() {
-    position = 0;
-    length = 0;
-    value = 0.0;
-    token = kTokenInvalid;
+    _position = 0;
+    _size = 0;
+    _value = 0.0;
+    _tokenType = kTokenInvalid;
   }
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE uint32_t setData(size_t position, size_t length, uint32_t hVal, uint32_t token) {
-    this->position = position;
-    this->length = length;
-    this->hVal = hVal;
-    this->token = token;
+  inline uint32_t setData(size_t position, size_t size, uint32_t hashCode, uint32_t tokenType) {
+    _position = position;
+    _size = size;
+    _hashCode = hashCode;
+    _tokenType = tokenType;
 
-    return token;
+    return tokenType;
   }
 
-  MATHPRESSO_INLINE uint32_t getPosAsUInt() const {
-    MATHPRESSO_ASSERT(position < ~static_cast<uint32_t>(0));
-    return static_cast<uint32_t>(position);
+  inline uint32_t tokenType() const noexcept { return _tokenType; }
+  inline uint32_t hashCode() const noexcept { return _hashCode; }
+
+  inline size_t position() const noexcept { return _position; }
+  inline size_t size() const noexcept { return _size; }
+
+  inline uint32_t positionAsUInt() const noexcept {
+    MATHPRESSO_ASSERT(_position < ~static_cast<uint32_t>(0));
+    return static_cast<uint32_t>(_position);
   }
+
+  inline double value() const noexcept { return _value; }
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Token position from the beginning of the input.
-  size_t position;
-  //! Token string length.
-  size_t length;
-
-  //! Token hash (only if the token is symbol or keyword).
-  uint32_t hVal;
-  //! Token type.
-  uint32_t token;
-
-  //! Token value (if the token is a number).
-  double value;
+  uint32_t _tokenType;                   //!< Token type.
+  uint32_t _hashCode;                    //!< Token hash-code (only if the token is symbol or keyword).
+  size_t _position;                      //!< Token position from the beginning of the input.
+  size_t _size;                          //!< Token size.
+  double _value;                         //!< Token value (if the token is a number).
 };
 
 // ============================================================================
@@ -153,16 +154,16 @@ struct Token {
 // ============================================================================
 
 struct Tokenizer {
-  MATHPRESSO_NO_COPY(Tokenizer)
+  MATHPRESSO_NONCOPYABLE(Tokenizer)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Tokenizer(const char* s, size_t sLen)
-    : _p(s),
-      _start(s),
-      _end(s + sLen),
+  MATHPRESSO_INLINE Tokenizer(const char* str, size_t size)
+    : _p(str),
+      _start(str),
+      _end(str + size),
       _strtod() {
     _token.reset();
   }
@@ -179,18 +180,18 @@ struct Tokenizer {
   //! Set the token that will be returned by `next()` and `peek()` functions.
   MATHPRESSO_INLINE void set(Token* token) {
     // We have to update also _p in case that multiple tokens were put back.
-    _p = _start + token->position + token->length;
+    _p = _start + token->_position + token->_size;
     _token = *token;
   }
 
   //! Consume a token got by using peek().
   MATHPRESSO_INLINE void consume() {
-    _token.token = kTokenInvalid;
+    _token._tokenType = kTokenInvalid;
   }
 
   //! Consume a token got by using peek() and call `peek()`.
   //!
-  //! NOTE: Can be called only immediately after peek().
+  //! \note Can be called only immediately after peek().
   MATHPRESSO_INLINE uint32_t consumeAndPeek(Token* token) {
     consume();
     return peek(token);
@@ -198,7 +199,7 @@ struct Tokenizer {
 
   //! Consume a token got by using peek() and call `next()`.
   //!
-  //! NOTE: Can be called only immediately after peek().
+  //! \note Can be called only immediately after peek().
   MATHPRESSO_INLINE uint32_t consumeAndNext(Token* token) {
     consume();
     return next(token);

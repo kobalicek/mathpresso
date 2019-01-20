@@ -29,7 +29,7 @@ struct AstVar;
 // ============================================================================
 
 struct Parser {
-  MATHPRESSO_NO_COPY(Parser)
+  MATHPRESSO_NONCOPYABLE(Parser)
 
   enum Flags {
     kNoFlags = 0x00,
@@ -41,18 +41,18 @@ struct Parser {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE Parser(AstBuilder* ast, ErrorReporter* errorReporter, const char* body, size_t len)
+  MATHPRESSO_INLINE Parser(AstBuilder* ast, ErrorReporter* errorReporter, const char* body, size_t size)
     : _ast(ast),
       _errorReporter(errorReporter),
-      _currentScope(ast->getRootScope()),
-      _tokenizer(body, len) {}
+      _currentScope(ast->rootScope()),
+      _tokenizer(body, size) {}
   MATHPRESSO_INLINE ~Parser() {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  MATHPRESSO_INLINE AstScope* getCurrentScope() const { return _currentScope; }
+  MATHPRESSO_INLINE AstScope* currentScope() const { return _currentScope; }
 
   // --------------------------------------------------------------------------
   // [Parse]

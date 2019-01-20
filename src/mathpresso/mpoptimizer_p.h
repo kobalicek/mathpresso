@@ -18,7 +18,7 @@ namespace mathpresso {
 // ============================================================================
 
 struct AstOptimizer : public AstVisitor {
-  MATHPRESSO_NO_COPY(AstOptimizer)
+  MATHPRESSO_NONCOPYABLE(AstOptimizer)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

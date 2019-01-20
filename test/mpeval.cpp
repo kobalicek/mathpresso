@@ -20,7 +20,7 @@ struct Variables {
 // `kMessageError`, because it signalizes an invalid expression. Other message
 // types are used mostly for debugging.
 struct MyOutputLog : public mathpresso::OutputLog {
-  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t len) {
+  virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
     if (type == kMessageError)
       printf("ERROR: %s\n", message);
     else

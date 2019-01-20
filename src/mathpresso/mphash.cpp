@@ -5,7 +5,7 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Export]
-#define MATHPRESSO_EXPORTS
+#define MATHPRESSO_BUILD_EXPORT
 
 // [Dependencies]
 #include "./mphash_p.h"
@@ -24,19 +24,19 @@ static const uint32_t mpPrimeTable[] = {
 // [mathpresso::HashUtils]
 // ============================================================================
 
-uint32_t HashUtils::hashString(const char* kStr, size_t kLen) {
-  if (kLen == 0)
+uint32_t HashUtils::hashString(const char* data, size_t size) {
+  if (size == 0)
     return 0;
 
-  uint32_t hVal = *kStr++;
-  if (--kLen == 0)
-    return hVal;
+  uint32_t hashCode = uint8_t(*data++);
+  if (--size == 0)
+    return hashCode;
 
   do {
-    hVal = HashUtils::hashChar(hVal, static_cast<uint8_t>(*kStr++));
-  } while (--kLen);
+    hashCode = HashUtils::hashChar(hashCode, uint8_t(*data++));
+  } while (--size);
 
-  return hVal;
+  return hashCode;
 }
 
 uint32_t HashUtils::closestPrime(uint32_t x) {
@@ -55,11 +55,11 @@ uint32_t HashUtils::closestPrime(uint32_t x) {
 // ============================================================================
 
 void HashBase::_rehash(uint32_t newCount) {
-  ZoneHeap* heap = _heap;
+  ZoneAllocator* allocator = _allocator;
 
   HashNode** oldData = _data;
   HashNode** newData = static_cast<HashNode**>(
-    heap->allocZeroed(
+    allocator->allocZeroed(
       static_cast<size_t>(newCount + kExtraCount) * sizeof(void*)));
 
   if (newData == NULL)
@@ -72,7 +72,7 @@ void HashBase::_rehash(uint32_t newCount) {
     HashNode* node = oldData[i];
     while (node != NULL) {
       HashNode* next = node->_next;
-      uint32_t hMod = node->_hVal % newCount;
+      uint32_t hMod = node->_hashCode % newCount;
 
       node->_next = newData[hMod];
       newData[hMod] = node;
@@ -93,7 +93,7 @@ void HashBase::_rehash(uint32_t newCount) {
 
   _data = newData;
   if (oldData != _embedded)
-    heap->release(oldData,
+    allocator->release(oldData,
       static_cast<size_t>(oldCount + kExtraCount) * sizeof(void*));
 }
 
@@ -145,13 +145,13 @@ void HashBase::_mergeToInvisibleSlot(HashBase& other) {
 // ============================================================================
 
 HashNode* HashBase::_put(HashNode* node) {
-  uint32_t hMod = node->_hVal % _bucketsCount;
+  uint32_t hMod = node->_hashCode % _bucketsCount;
   HashNode* next = _data[hMod];
 
   node->_next = next;
   _data[hMod] = node;
 
-  if (++_length >= _bucketsGrow && next != NULL) {
+  if (++_size >= _bucketsGrow && next != NULL) {
     uint32_t newCapacity = HashUtils::closestPrime(_bucketsCount + kExtraCount);
     if (newCapacity != _bucketsCount)
       _rehash(newCapacity);
@@ -161,7 +161,7 @@ HashNode* HashBase::_put(HashNode* node) {
 }
 
 HashNode* HashBase::_del(HashNode* node) {
-  uint32_t hMod = node->_hVal % _bucketsCount;
+  uint32_t hMod = node->_hashCode % _bucketsCount;
 
   HashNode** pPrev = &_data[hMod];
   HashNode* p = *pPrev;
