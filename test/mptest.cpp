@@ -458,12 +458,12 @@ struct TestApp {
     printf("  z = %f\n", (double)z);
     printf("  big = %f\n", (double)big);
 
-    for (int i = 0; i < MATHPRESSO_ARRAY_SIZE(tests); i++) {
+    for (size_t i = 0; i < MATHPRESSO_ARRAY_SIZE(tests); i++) {
       const TestExpression& test = tests[i];
       const char* exp = test.expression;
       bool allOk = true;
 
-      for (int j = 0; j < MATHPRESSO_ARRAY_SIZE(options); j++) {
+      for (size_t j = 0; j < MATHPRESSO_ARRAY_SIZE(options); j++) {
         const TestOption& option = options[j];
 
         if (verbose) {

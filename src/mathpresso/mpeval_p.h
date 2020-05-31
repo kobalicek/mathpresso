@@ -47,9 +47,9 @@ union DoubleBits {
 
 // The `a != a` condition is used to handle NaN values properly. If one of `a`
 // and `b` is NaN the result should be NaN. When `T` isn't a floating point the
-// condition should be removed by C++ compiler.
-template<typename T> MATHPRESSO_INLINE T mpMin(T a, T b) { return (a != a) | (a < b) ? a : b; }
-template<typename T> MATHPRESSO_INLINE T mpMax(T a, T b) { return (a != a) | (a > b) ? a : b; }
+// condition should be removed by the C++ compiler.
+template<typename T> MATHPRESSO_INLINE T mpMin(T a, T b) { return ((a != a) | (a < b)) ? a : b; }
+template<typename T> MATHPRESSO_INLINE T mpMax(T a, T b) { return ((a != a) | (a > b)) ? a : b; }
 
 static MATHPRESSO_INLINE double mpGetNan() { static const DoubleBits value = { 0x7FF8000000000000u }; return value.d; }
 static MATHPRESSO_INLINE double mpGetInf() { static const DoubleBits value = { 0x7FF0000000000000u }; return value.d; }

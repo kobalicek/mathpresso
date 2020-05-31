@@ -28,7 +28,7 @@ struct MyOutputLog : public mathpresso::OutputLog {
   }
 };
 
-int main(int argc, char* argv[]) {
+int main() {
   mathpresso::Context ctx;
   mathpresso::Expression e;
 

@@ -197,7 +197,7 @@ JitCompiler::JitCompiler(ZoneAllocator* allocator, x86::Compiler* cc)
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::beginFunction() {
-  cc->addFunc(FuncSignatureT<void, double*, double*>(CallConv::kIdHostCDecl));
+  cc->addFunc(FuncSignatureT<void, double*, double*>(CallConv::kIdCDecl));
 
   varPtr = cc->newIntPtr("varPtr");
   constPtr = cc->newIntPtr("constPtr");
@@ -777,11 +777,12 @@ void JitCompiler::inlineCall(const x86::Xmm& dst, const x86::Xmm* args, uint32_t
     signature.addArgT<double>();
 
   // Create the function call.
-  FuncCallNode* ctx = cc->call((uint64_t)fn, signature);
-  ctx->setRet(0, dst);
+  InvokeNode* invokeNode;
+  cc->invoke(&invokeNode, (uint64_t)fn, signature);
+  invokeNode->setRet(0, dst);
 
   for (i = 0; i < count; i++)
-    ctx->setArg(static_cast<uint32_t>(i), args[i]);
+    invokeNode->setArg(static_cast<uint32_t>(i), args[i]);
 }
 
 void JitCompiler::prepareConstPool() {
@@ -807,9 +808,10 @@ JitVar JitCompiler::getConstantU64(uint64_t value) {
 JitVar JitCompiler::getConstantU64AsPD(uint64_t value) {
   prepareConstPool();
 
+  uint64_t data[2] = { value, 0 };
   size_t offset;
-  Data128 vec = Data128::fromU64(value, 0);
-  if (constPool.add(&vec, sizeof(Data128), offset) != kErrorOk)
+
+  if (constPool.add(data, sizeof(data), offset) != kErrorOk)
     return JitVar();
 
   return JitVar(x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
@@ -831,7 +833,7 @@ CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log
   StringLogger logger;
 
   CodeHolder code;
-  code.init((jitGlobal.runtime.codeInfo()));
+  code.init((jitGlobal.runtime.environment()));
 
   x86::Compiler c(&code);
   bool debugMachineCode = log != nullptr && (options & kOptionDebugMachineCode) != 0;

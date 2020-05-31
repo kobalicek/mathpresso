@@ -50,7 +50,7 @@ struct MyOutputLog : public mathpresso::OutputLog {
   }
 };
 
-int main(int argc, char* argv[]) {
+int main() {
   MyOutputLog outputLog;
 
   // Create the context, add builtins and define the `Data` layout.

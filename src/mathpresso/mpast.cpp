@@ -500,7 +500,7 @@ Error AstDump::info(const char* fmt, ...) {
 
   _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
   _sb.appendVFormat(fmt, ap);
-  _sb.appendChar('\n');
+  _sb.append('\n');
 
   va_end(ap);
   return kErrorOk;
@@ -512,7 +512,7 @@ Error AstDump::nest(const char* fmt, ...) {
 
   _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
   _sb.appendVFormat(fmt, ap);
-  _sb.appendChar('\n');
+  _sb.append('\n');
 
   va_end(ap);
   _level++;
