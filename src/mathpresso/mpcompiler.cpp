@@ -168,28 +168,25 @@ struct MATHPRESSO_NOAPI JitCompiler {
   JitVar getConstantD64AsPD(double value);
 
   // Members.
-  ZoneAllocator* allocator;
-  x86::Compiler* cc;
+  ZoneAllocator* allocator = nullptr;
+  x86::Compiler* cc = nullptr;
 
   x86::Gp varPtr;
   x86::Gp constPtr;
   x86::Gp resultPtr;
 
-  JitVar* varSlots;
-  BaseNode* functionBody;
+  JitVar* varSlots = nullptr;
+  BaseNode* functionBody = nullptr;
+  ConstPoolNode* constPool = nullptr;
 
-  Label constLabel;
-  ConstPool constPool;
-
-  bool enableSSE4_1;
+  bool enableSSE4_1 = false;
 };
 
 JitCompiler::JitCompiler(ZoneAllocator* allocator, x86::Compiler* cc)
   : allocator(allocator),
     cc(cc),
     varSlots(NULL),
-    functionBody(NULL),
-    constPool(&cc->_codeZone) {
+    functionBody(NULL) {
 
   const x86::Features& features = CpuInfo::host().features().as<x86::Features>();
   enableSSE4_1 = features.hasSSE4_1();
@@ -211,9 +208,8 @@ void JitCompiler::beginFunction() {
 
 void JitCompiler::endFunction() {
   cc->endFunc();
-
-  if (constLabel.isValid())
-    cc->embedConstPool(constLabel, constPool);
+  if (constPool)
+    cc->addNode(constPool);
 }
 
 JitVar JitCompiler::copyVar(const JitVar& other, uint32_t flags) {
@@ -786,11 +782,11 @@ void JitCompiler::inlineCall(const x86::Xmm& dst, const x86::Xmm* args, uint32_t
 }
 
 void JitCompiler::prepareConstPool() {
-  if (!constLabel.isValid()) {
-    constLabel = cc->newLabel();
+  if (!constPool) {
+    cc->_newConstPoolNode(&constPool);
 
     BaseNode* prev = cc->setCursor(functionBody);
-    cc->lea(constPtr, x86::ptr(constLabel));
+    cc->lea(constPtr, x86::ptr(constPool->label()));
     if (prev != functionBody) cc->setCursor(prev);
   }
 }
@@ -799,7 +795,7 @@ JitVar JitCompiler::getConstantU64(uint64_t value) {
   prepareConstPool();
 
   size_t offset;
-  if (constPool.add(&value, sizeof(uint64_t), offset) != kErrorOk)
+  if (constPool->add(&value, sizeof(uint64_t), offset) != kErrorOk)
     return JitVar();
 
   return JitVar(x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
@@ -811,7 +807,7 @@ JitVar JitCompiler::getConstantU64AsPD(uint64_t value) {
   uint64_t data[2] = { value, 0 };
   size_t offset;
 
-  if (constPool.add(data, sizeof(data), offset) != kErrorOk)
+  if (constPool->add(data, sizeof(data), offset) != kErrorOk)
     return JitVar();
 
   return JitVar(x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
