@@ -111,7 +111,7 @@ struct MATHPRESSO_NOAPI JitVar {
 
   inline bool isNone() const noexcept { return _op.isNone(); }
   inline bool isMem() const noexcept { return _op.isMem(); }
-  inline bool isXmm() const noexcept { return _op.isReg(x86::Reg::kTypeXmm); }
+  inline bool isXmm() const noexcept { return _op.isReg(RegType::kX86_Xmm); }
 
   inline const Operand& op() const noexcept { return _op; }
   inline const x86::Mem& mem() const noexcept { return _op.as<x86::Mem>(); }
@@ -176,7 +176,7 @@ struct MATHPRESSO_NOAPI JitCompiler {
   x86::Gp resultPtr;
 
   JitVar* varSlots = nullptr;
-  BaseNode* functionBody = nullptr;
+  BaseNode* funcBody = nullptr;
   ConstPoolNode* constPool = nullptr;
 
   bool enableSSE4_1 = false;
@@ -186,24 +186,23 @@ JitCompiler::JitCompiler(ZoneAllocator* allocator, x86::Compiler* cc)
   : allocator(allocator),
     cc(cc),
     varSlots(NULL),
-    functionBody(NULL) {
+    funcBody(NULL) {
 
-  const x86::Features& features = CpuInfo::host().features().as<x86::Features>();
+  const CpuFeatures::X86& features = CpuInfo::host().features().x86();
   enableSSE4_1 = features.hasSSE4_1();
 }
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::beginFunction() {
-  cc->addFunc(FuncSignatureT<void, double*, double*>(CallConv::kIdCDecl));
+  FuncNode* funcNode = cc->addFunc(FuncSignatureT<void, double*, double*>(CallConvId::kCDecl));
 
   varPtr = cc->newIntPtr("varPtr");
   constPtr = cc->newIntPtr("constPtr");
   resultPtr = cc->newIntPtr("resultPtr");
 
-  cc->setArg(0, resultPtr);
-  cc->setArg(1, varPtr);
-
-  functionBody = cc->cursor();
+  funcNode->setArg(0, resultPtr);
+  funcNode->setArg(1, varPtr);
+  funcBody = cc->cursor();
 }
 
 void JitCompiler::endFunction() {
@@ -356,14 +355,14 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
 
     case kOpNot: {
       var = writableVar(var);
-      cc->cmpsd(var.xmm(), getConstantD64AsPD(0.0).mem(), int(x86::Predicate::kCmpEQ));
+      cc->cmpsd(var.xmm(), getConstantD64AsPD(0.0).mem(), x86::CmpImm::kEQ);
       cc->andpd(var.xmm(), getConstantD64AsPD(1.0).mem());
       return var;
     }
 
     case kOpIsNan: {
       var = writableVar(var);
-      cc->cmpsd(var.xmm(), var.xmm(), int(x86::Predicate::kCmpEQ));
+      cc->cmpsd(var.xmm(), var.xmm(), x86::CmpImm::kEQ);
       cc->andnpd(var.xmm(), getConstantD64AsPD(1.0).mem());
       return var;
     }
@@ -371,7 +370,7 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
     case kOpIsInf: {
       var = writableVar(var);
       cc->orpd(var.xmm(), getConstantU64AsPD(0x8000000000000000u).mem());
-      cc->cmpsd(var.xmm(), getConstantU64(0xFFF0000000000000u).mem(), int(x86::Predicate::kCmpEQ));
+      cc->cmpsd(var.xmm(), getConstantU64(0xFFF0000000000000u).mem(), x86::CmpImm::kEQ);
       cc->andpd(var.xmm(), getConstantD64AsPD(1.0).mem());
       return var;
     }
@@ -379,14 +378,14 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
     case kOpIsFinite: {
       var = writableVar(var);
       cc->orpd(var.xmm(), getConstantU64AsPD(0x8000000000000000u).mem());
-      cc->cmpsd(var.xmm(), getConstantD64(0.0).mem(), int(x86::Predicate::kCmpLE));
+      cc->cmpsd(var.xmm(), getConstantD64(0.0).mem(), x86::CmpImm::kLE);
       cc->andpd(var.xmm(), getConstantD64AsPD(1.0).mem());
       return var;
     }
 
     case kOpSignBit: {
       x86::Xmm result = cc->newXmmSd();
-      cc->pshufd(result, registerVar(var).xmm(), x86::Predicate::shuf(3, 2, 1, 1));
+      cc->pshufd(result, registerVar(var).xmm(), x86::shuffleImm(3, 2, 1, 1));
       cc->psrad(result, 31);
       cc->andpd(result, getConstantD64AsPD(1.0).mem());
       return JitVar(result, JitVar::FLAG_NONE);
@@ -427,7 +426,7 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
       x86::Xmm tmp = cc->newXmmSd();
 
       if (enableSSE4_1) {
-        cc->emit(x86::Inst::kIdRoundsd, tmp, var.op(), int(x86::Predicate::kRoundDown | x86::Predicate::kRoundInexact));
+        cc->emit(x86::Inst::kIdRoundsd, tmp, var.op(), x86::RoundImm::kDown | x86::RoundImm::kSuppress);
         cc->emit(x86::Inst::kIdSubsd, var.op(), tmp);
         return var;
       }
@@ -510,18 +509,18 @@ JitVar JitCompiler::onBinaryOp(AstBinaryOp* node) {
   }
 
   uint32_t inst = 0;
-  int predicate = 0;
+  x86::CmpImm cmpImm {};
 
   switch (op) {
-    case kOpEq: predicate = x86::Predicate::kCmpEQ ; goto emitCompare;
-    case kOpNe: predicate = x86::Predicate::kCmpNEQ; goto emitCompare;
-    case kOpGt: predicate = x86::Predicate::kCmpNLE; goto emitCompare;
-    case kOpGe: predicate = x86::Predicate::kCmpNLT; goto emitCompare;
-    case kOpLt: predicate = x86::Predicate::kCmpLT ; goto emitCompare;
-    case kOpLe: predicate = x86::Predicate::kCmpLE ; goto emitCompare;
+    case kOpEq: cmpImm = x86::CmpImm::kEQ ; goto emitCompare;
+    case kOpNe: cmpImm = x86::CmpImm::kNEQ; goto emitCompare;
+    case kOpGt: cmpImm = x86::CmpImm::kNLE; goto emitCompare;
+    case kOpGe: cmpImm = x86::CmpImm::kNLT; goto emitCompare;
+    case kOpLt: cmpImm = x86::CmpImm::kLT ; goto emitCompare;
+    case kOpLe: cmpImm = x86::CmpImm::kLE ; goto emitCompare;
 emitCompare: {
       vl = writableVar(vl);
-      cc->emit(x86::Inst::kIdCmpsd, vl.xmm(), vr.op(), predicate);
+      cc->emit(x86::Inst::kIdCmpsd, vl.xmm(), vr.op(), cmpImm);
       cc->emit(x86::Inst::kIdAndpd, vl.xmm(), getConstantD64AsPD(1.0).op());
       return vl;
     }
@@ -606,29 +605,28 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   if (enableSSE4_1) {
     if (op == kOpRound) {
       x86::Xmm tmp = cc->newXmmSd();
-      cc->roundsd(tmp, src, x86::Predicate::kRoundDown |
-                            x86::Predicate::kRoundInexact);
+      cc->roundsd(tmp, src, x86::RoundImm::kDown | x86::RoundImm::kSuppress);
 
       if (dst.id() != src.id())
         cc->movsd(dst, src);
 
       cc->subsd(dst, tmp);
-      cc->cmpsd(dst, getConstantD64(0.5).mem(), x86::Predicate::kCmpNLT);
+      cc->cmpsd(dst, getConstantD64(0.5).mem(), x86::CmpImm::kNLT);
       cc->andpd(dst, getConstantD64AsPD(1.0).mem());
       cc->addpd(dst, tmp);
     }
     else {
-      int predicate = 0;
+      x86::RoundImm roundImm {};
 
       switch (op) {
-        case kOpRoundEven: predicate = x86::Predicate::kRoundNearest; break;
-        case kOpTrunc    : predicate = x86::Predicate::kRoundTrunc  ; break;
-        case kOpFloor    : predicate = x86::Predicate::kRoundDown   ; break;
-        case kOpCeil     : predicate = x86::Predicate::kRoundUp     ; break;
+        case kOpRoundEven: roundImm = x86::RoundImm::kNearest; break;
+        case kOpTrunc    : roundImm = x86::RoundImm::kTrunc  ; break;
+        case kOpFloor    : roundImm = x86::RoundImm::kDown   ; break;
+        case kOpCeil     : roundImm = x86::RoundImm::kUp     ; break;
         default:
           MATHPRESSO_ASSERT_NOT_REACHED();
       }
-      cc->roundsd(dst, src, predicate | x86::Predicate::kRoundInexact);
+      cc->roundsd(dst, src, roundImm | x86::RoundImm::kSuppress);
     }
     return;
   }
@@ -651,7 +649,7 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
     cc->movsd(t2, src);
 
     cc->addsd(t1, getConstantD64(magic0).mem());
-    cc->cmpsd(t2, getConstantD64(maxn).mem(), x86::Predicate::kCmpNLT);
+    cc->cmpsd(t2, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
     cc->subsd(t1, getConstantD64(magic0).mem());
 
     // Combine the result.
@@ -687,7 +685,7 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
         cc->subsd(t2, getConstantD64(magic0).mem());
         cc->subsd(t3, getConstantD64(magic1).mem());
 
-        cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::Predicate::kCmpNLT);
+        cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
         cc->maxsd(t2, t3);
 
         cc->andpd(dst, t1);
@@ -698,9 +696,9 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
         cc->movsd(t1, src);
 
         cc->subsd(t2, getConstantD64(magic0).mem());
-        cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::Predicate::kCmpNLT);
+        cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
 
-        cc->cmpsd(t3, t2, x86::Predicate::kCmpLT);
+        cc->cmpsd(t3, t2, x86::CmpImm::kLT);
         cc->andpd(t3, getConstantD64AsPD(1.0).mem());
 
         cc->andpd(dst, t1);
@@ -712,9 +710,9 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
         cc->movsd(t1, src);
 
         cc->subsd(t2, getConstantD64(magic0).mem());
-        cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::Predicate::kCmpNLT);
+        cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
 
-        cc->cmpsd(t3, t2, x86::Predicate::kCmpNLE);
+        cc->cmpsd(t3, t2, x86::CmpImm::kNLE);
         cc->andpd(t3, getConstantD64AsPD(1.0).mem());
 
         cc->andpd(dst, t1);
@@ -744,9 +742,9 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
     cc->movsd(t3, t1);
 
     cc->subsd(t2, getConstantD64(magic0).mem());
-    cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::Predicate::kCmpNLT);
+    cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
 
-    cc->cmpsd(t3, t2, x86::Predicate::kCmpLT);
+    cc->cmpsd(t3, t2, x86::CmpImm::kLT);
     cc->orpd(t1, getConstantU64AsPD(0x8000000000000000u).mem());
     cc->andpd(t3, getConstantD64AsPD(1.0).mem());
 
@@ -783,11 +781,11 @@ void JitCompiler::inlineCall(const x86::Xmm& dst, const x86::Xmm* args, uint32_t
 
 void JitCompiler::prepareConstPool() {
   if (!constPool) {
-    cc->_newConstPoolNode(&constPool);
+    cc->newConstPoolNode(&constPool);
 
-    BaseNode* prev = cc->setCursor(functionBody);
+    BaseNode* prev = cc->setCursor(funcBody);
     cc->lea(constPtr, x86::ptr(constPool->label()));
-    if (prev != functionBody) cc->setCursor(prev);
+    if (prev != funcBody) cc->setCursor(prev);
   }
 }
 
@@ -836,16 +834,11 @@ CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log
   bool debugCompiler    = log != nullptr && (options & kOptionDebugCompiler   ) != 0;
 
   if (debugMachineCode || debugCompiler) {
-    logger.addFlags(FormatOptions::kFlagMachineCode |
-                    FormatOptions::kFlagRegCasts    |
-                    FormatOptions::kFlagExplainImms |
-                    FormatOptions::kFlagAnnotations);
+    logger.addFlags(FormatFlags::kMachineCode | FormatFlags::kRegCasts | FormatFlags::kExplainImms);
+    code.setLogger(&logger);
 
     if (debugCompiler)
-      logger.addFlags(FormatOptions::kFlagDebugPasses |
-                      FormatOptions::kFlagDebugRA);
-
-    code.setLogger(&logger);
+      c.addDiagnosticOptions(DiagnosticOptions::kRAAnnotate | DiagnosticOptions::kRADebugAll);
   }
 
   JitCompiler jitCompiler(ast->allocator(), &c);

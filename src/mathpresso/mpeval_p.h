@@ -53,9 +53,9 @@ template<typename T> MATHPRESSO_INLINE T mpMax(T a, T b) { return ((a != a) | (a
 
 static MATHPRESSO_INLINE double mpGetNan() { static const DoubleBits value = { 0x7FF8000000000000u }; return value.d; }
 static MATHPRESSO_INLINE double mpGetInf() { static const DoubleBits value = { 0x7FF0000000000000u }; return value.d; }
-static MATHPRESSO_INLINE bool mpIsNan(double x) { return DoubleBits::fromDouble(x).isNan(); }
-static MATHPRESSO_INLINE bool mpIsInf(double x) { return DoubleBits::fromDouble(x).isInf(); }
-static MATHPRESSO_INLINE bool mpIsFinite(double x) { return DoubleBits::fromDouble(x).isFinite(); }
+static MATHPRESSO_INLINE double mpIsNan(double x) { return DoubleBits::fromDouble(x).isNan(); }
+static MATHPRESSO_INLINE double mpIsInf(double x) { return DoubleBits::fromDouble(x).isInf(); }
+static MATHPRESSO_INLINE double mpIsFinite(double x) { return DoubleBits::fromDouble(x).isFinite(); }
 
 static MATHPRESSO_INLINE double mpRound(double x) {
   double y = ::floor(x);

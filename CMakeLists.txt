@@ -6,9 +6,8 @@ if(NOT CMAKE_PROJECT_NAME OR "${CMAKE_PROJECT_NAME}" STREQUAL "mathpresso")
   project(mathpresso CXX)
 endif()
 
-# =============================================================================
-# [MathPresso - Configuration]
-# =============================================================================
+# MathPresso - Configuration
+# ==========================
 
 if (NOT DEFINED MATHPRESSO_DIR)
   set(MATHPRESSO_DIR "${CMAKE_CURRENT_LIST_DIR}")
@@ -25,9 +24,8 @@ set(MATHPRESSO_TEST   FALSE               CACHE BOOL "Build 'mathpresso' test ap
 set(MATHPRESSO_EMBED  FALSE               CACHE BOOL "Embed 'mathpresso' library (no targets)")
 set(MATHPRESSO_STATIC ${MATHPRESSO_EMBED} CACHE BOOL "Build 'mathpresso' library as static")
 
-# =============================================================================
-# [MathPresso - Project]
-# =============================================================================
+# MathPresso - Project
+# ====================
 
 set(MATHPRESSO_INCLUDE_DIRS ${MATHPRESSO_DIR}/src)
 set(MATHPRESSO_DEPS "")
@@ -80,9 +78,8 @@ endif()
 list(REMOVE_DUPLICATES MATHPRESSO_DEPS)
 list(REMOVE_DUPLICATES MATHPRESSO_PRIVATE_CFLAGS)
 
-# =============================================================================
-# [MathPresso - Sources]
-# =============================================================================
+# MathPresso - Sources
+# ====================
 
 set(MATHPRESSO_SRC_LIST
   mathpresso/mathpresso.cpp
@@ -111,9 +108,8 @@ foreach(_src_file ${MATHPRESSO_SRC_LIST})
 endforeach()
 source_group(TREE "${MATHPRESSO_DIR}" FILES ${MATHPRESSO_SRC})
 
-# =============================================================================
-# [MathPresso - Targets]
-# =============================================================================
+# MathPresso - Targets
+# ====================
 
 if (NOT MATHPRESSO_EMBED)
   add_library(mathpresso ${MATHPRESSO_TARGET_TYPE} ${MATHPRESSO_SRC} ${ASMJIT_SRC})

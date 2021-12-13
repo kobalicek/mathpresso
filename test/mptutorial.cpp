@@ -22,6 +22,8 @@ struct Data {
 // types are used mostly for debugging.
 struct MyOutputLog : public mathpresso::OutputLog {
   virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
+    (void)size;
+
     switch (type) {
       case kMessageError:
         printf("[ERROR]: %s (line %u, column %u)\n", message, line, column);

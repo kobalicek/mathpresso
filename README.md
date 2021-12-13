@@ -324,24 +324,16 @@ RESULT: -1885.514400
 ```
 
 
-Dependencies
-------------
+Build Dependencies
+------------------
 
-  * AsmJit
+  * [AsmJit](https://asmjit.com)
 
 
 Support
 -------
 
 MathPresso is an open-source library released under a permissive ZLIB license, which makes it possible to use it freely in any open-source or commercial product. Free support is available through issues and gitter channel.
-
-If you use MathPresso in a non-commercial project and would like to appreciate the library in the form of a donation you are welcome to support us. Donations are anonymous unless the donor lets us know otherwise. The order and format of listed donors is not guaranteed and may change in the future. Additionally, donations should be considered as an appreciation of past work and not used to gain special privileges in terms of future development. MathPresso authors reserve the right to remove a donor from the list in extreme cases of disruptive behavior against other community members. Diversity of opinions and constructive criticism will always be welcome in the MathPresso community.
-
-Donation Addresses:
-
-  * BTC: 14dEp5h8jYSxgXB9vcjE8eh78uweD76o7W
-  * ETH: 0xd4f0b9424cF31DF5a5359D029CF3A65c500a581E
-  * Please contact us if you would like to donate through a different channel or to use a different crypto-currency. Wire transfers and SEPA payments are both possible.
 
 
 Authors & Maintainers

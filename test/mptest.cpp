@@ -86,9 +86,11 @@ struct TestOutputLog : public mathpresso::OutputLog {
   TestOutputLog() {}
   virtual ~TestOutputLog() {}
   virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
+    (void)size;
+
     switch (type) {
-      case kMessageError     : printf("[Failure]: %s (at %u)\n", message, column); break;
-      case kMessageWarning   : printf("[Warning]: %s (at %u)\n", message, column); break;
+      case kMessageError     : printf("[Failure]: %s (at %u:%u)\n", message, line, column); break;
+      case kMessageWarning   : printf("[Warning]: %s (at %u:%u)\n", message, line, column); break;
       case kMessageAstInitial: printf("[AST-Initial]:\n%s", message); break;
       case kMessageAstFinal  : printf("[AST-Final]:\n%s", message); break;
       case kMessageAsm       : printf("[Machine-Code]:\n%s", message); break;

@@ -86,6 +86,7 @@ Error AstOptimizer::onVar(AstVar* node) {
 }
 
 Error AstOptimizer::onImm(AstImm* node) {
+  (void)node;
   return kErrorOk;
 }
 

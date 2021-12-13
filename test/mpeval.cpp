@@ -21,6 +21,10 @@ struct Variables {
 // types are used mostly for debugging.
 struct MyOutputLog : public mathpresso::OutputLog {
   virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) {
+    (void)line;
+    (void)column;
+    (void)size;
+
     if (type == kMessageError)
       printf("ERROR: %s\n", message);
     else
