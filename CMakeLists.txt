@@ -6,6 +6,8 @@ if(NOT CMAKE_PROJECT_NAME OR "${CMAKE_PROJECT_NAME}" STREQUAL "mathpresso")
   project(mathpresso CXX)
 endif()
 
+include(GNUInstallDirs)
+
 # MathPresso - Configuration
 # ==========================
 
@@ -121,8 +123,15 @@ if (NOT MATHPRESSO_EMBED)
   target_compile_features(mathpresso PUBLIC cxx_std_11)
   set_property(TARGET mathpresso PROPERTY CXX_VISIBILITY_PRESET hidden)
 
-  target_include_directories(mathpresso PRIVATE BEFORE ${ASMJIT_INCLUDE_DIRS})
-  target_include_directories(mathpresso PUBLIC BEFORE ${MATHPRESSO_INCLUDE_DIRS})
+  target_include_directories(mathpresso BEFORE PRIVATE ${ASMJIT_INCLUDE_DIRS})
+  # target_include_directories(mathpresso BEFORE PUBLIC ${MATHPRESSO_INCLUDE_DIRS})
+
+  target_include_directories(mathpresso BEFORE INTERFACE
+                             $<BUILD_INTERFACE:${MATHPRESSO_INCLUDE_DIRS}>
+                             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+
+  add_library(mathpresso::mathpresso ALIAS mathpresso)
 
   foreach(_src_file ${MATHPRESSO_SRC_LIST})
     if ("${_src_file}" MATCHES "\\.h$" AND NOT "${_src_file}" MATCHES "_p\\.h$")
@@ -130,6 +139,17 @@ if (NOT MATHPRESSO_EMBED)
       install(FILES "${MATHPRESSO_DIR}/src/${_src_file}" DESTINATION "include/${_src_dir}")
     endif()
   endforeach()
+
+  install(TARGETS mathpresso
+          EXPORT mathpresso-config
+          RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+          ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+          LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+          INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+  install(EXPORT mathpresso-config
+          NAMESPACE mathpresso::
+          DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mathpresso")
 endif()
 
 if (MATHPRESSO_TEST)
