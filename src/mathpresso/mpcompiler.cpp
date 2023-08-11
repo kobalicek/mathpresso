@@ -164,8 +164,10 @@ struct MATHPRESSO_NOAPI JitCompiler {
   void prepareConstPool();
   JitVar getConstantU64(uint64_t value);
   JitVar getConstantU64AsPD(uint64_t value);
+  JitVar getConstantU64Aligned(uint64_t value);
   JitVar getConstantD64(double value);
   JitVar getConstantD64AsPD(double value);
+  JitVar getConstantD64Aligned(double value);
 
   // Members.
   ZoneAllocator* allocator = nullptr;
@@ -642,23 +644,17 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   const double magic1 = 6755399441055745.0;
 
   if (op == kOpRoundEven) {
-    x86::Xmm t1 = cc->newXmmSd();
-    x86::Xmm t2 = cc->newXmmSd();
+    x86::Xmm tmp = cc->newXmmSd();
 
-    cc->movsd(t1, src);
-    cc->movsd(t2, src);
+    cc->movsd(tmp, src);
+    cc->cmpsd(tmp, getConstantD64(maxn).mem(), x86::CmpImm::kLT);
+    cc->andpd(tmp, getConstantD64Aligned(magic0).mem());
 
-    cc->addsd(t1, getConstantD64(magic0).mem());
-    cc->cmpsd(t2, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
-    cc->subsd(t1, getConstantD64(magic0).mem());
-
-    // Combine the result.
     if (dst.id() != src.id())
       cc->movsd(dst, src);
 
-    cc->andpd(dst, t2);
-    cc->andnpd(t2, t1);
-    cc->orpd(dst, t2);
+    cc->addsd(dst, tmp);
+    cc->subsd(dst, tmp);
 
     return;
   }
@@ -811,6 +807,18 @@ JitVar JitCompiler::getConstantU64AsPD(uint64_t value) {
   return JitVar(x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
 }
 
+JitVar JitCompiler::getConstantU64Aligned(uint64_t value) {
+  prepareConstPool();
+
+  uint64_t two[2] = { value, value };
+
+  size_t offset;
+  if (constPool->add(two, sizeof(uint64_t) * 2, offset) != kErrorOk)
+    return JitVar();
+
+  return JitVar(x86::ptr(constPtr, static_cast<int>(offset)), JitVar::FLAG_NONE);
+}
+
 JitVar JitCompiler::getConstantD64(double value) {
   DoubleBits bits;
   bits.d = value;
@@ -821,6 +829,12 @@ JitVar JitCompiler::getConstantD64AsPD(double value) {
   DoubleBits bits;
   bits.d = value;
   return getConstantU64AsPD(bits.u);
+}
+
+JitVar JitCompiler::getConstantD64Aligned(double value) {
+  DoubleBits bits;
+  bits.d = value;
+  return getConstantU64Aligned(bits.u);
 }
 
 CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log) {
