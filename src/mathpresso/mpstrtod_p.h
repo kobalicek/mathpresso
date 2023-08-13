@@ -15,17 +15,12 @@
   #define MATHPRESSO_STRTOD_MSLOCALE
   #include <locale.h>
   #include <stdlib.h>
-#else
+#elif !defined(__OpenBSD__)
   #define MATHPRESSO_STRTOD_XLOCALE
   #include <locale.h>
   #include <stdlib.h>
   // xlocale.h is not available on Linux anymore, it uses <locale.h>.
-  #if defined(__APPLE__    ) || \
-      defined(__bsdi__     ) || \
-      defined(__DragonFly__) || \
-      defined(__FreeBSD__  ) || \
-      defined(__NetBSD__   ) || \
-      defined(__OpenBSD__  )
+  #if defined(__APPLE__) || defined(__FreeBSD__)
     #include <xlocale.h>
   #endif
 #endif
@@ -57,6 +52,9 @@ struct StrToD {
   locale_t handle;
 #else
   // Time bomb!
+  MATHPRESSO_INLINE StrToD() {}
+  MATHPRESSO_INLINE ~StrToD() {}
+
   MATHPRESSO_INLINE bool isOk() const { return true; }
   MATHPRESSO_INLINE double conv(const char* s, char** end) const { return strtod(s, end); }
 #endif
