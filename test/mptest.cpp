@@ -39,9 +39,8 @@ static inline void set_x87_mode(unsigned short mode) {
 }
 #endif
 
-// ============================================================================
-// [DoubleBits]
-// ============================================================================
+// Double Bits
+// ===========
 
 // This is a copy-pase from `mpeval_p.h`, we can't include it here since it's
 // private.
@@ -59,18 +58,16 @@ union DoubleBits {
   struct { unsigned int lo, hi; };
 };
 
-// ============================================================================
-// [TestOption]
-// ============================================================================
+// Test Option
+// ===========
 
 struct TestOption {
   const char* name;
   unsigned int options;
 };
 
-// ============================================================================
-// [TestExpression]
-// ============================================================================
+// Test Expression
+// ===============
 
 struct TestExpression {
   const char* expression;
@@ -78,9 +75,8 @@ struct TestExpression {
   double xyz[3];
 };
 
-// ============================================================================
-// [TestLog]
-// ============================================================================
+// Test Logger
+// ===========
 
 struct TestOutputLog : public mathpresso::OutputLog {
   TestOutputLog() {}
@@ -98,23 +94,27 @@ struct TestOutputLog : public mathpresso::OutputLog {
   }
 };
 
-// ============================================================================
-// [TestFunc]
-// ============================================================================
+// Test Functions
+// ==============
 
 static double custom1(double x) { return x; }
 static double custom2(double x, double y) { return x + y; }
 
-// ============================================================================
-// [TestApp]
-// ============================================================================
+// Test Application
+// ================
 
 // The reason for TestApp is that we want to replace all functions the
 // expression can use.
 struct TestApp {
-  // --------------------------------------------------------------------------
-  // [Compatibility with the MathPresso Language]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  int argc;
+  char** argv;
+
+
+  // Compatibility with the MathPresso Language
+  // ------------------------------------------
 
   // Constants / Variables.
   double E, PI;
@@ -139,19 +139,18 @@ struct TestApp {
   }
   inline double roundeven(double x) { return ::rint(x); }
 
-  // --------------------------------------------------------------------------
-  // [TestApp]
-  // --------------------------------------------------------------------------
+  // TestApp
+  // -------
 
   TestApp(int argc, char* argv[])
-    : E(2.7182818284590452354),
+    : argc(argc),
+      argv(argv),
+      E(2.7182818284590452354),
       PI(3.14159265358979323846),
       x(1.5),
       y(2.5),
       z(9.9),
-      big(4503599627370496.0),
-      argc(argc),
-      argv(argv) {}
+      big(4503599627370496.0) {}
 
   bool hasArg(const char* arg) {
     for (int i = 1; i < argc; i++) {
@@ -365,6 +364,10 @@ struct TestApp {
       TEST_INLINE(trunc(-x)),
       TEST_INLINE(trunc(-y)),
       TEST_INLINE(trunc(-big)),
+      TEST_INLINE(trunc(0.11)),
+      TEST_INLINE(trunc(-0.11)),
+      TEST_INLINE(trunc(1232323232.11)),
+      TEST_INLINE(trunc(-1232323232.11)),
 
       TEST_INLINE(floor(x)),
       TEST_INLINE(floor(y)),
@@ -507,18 +510,7 @@ struct TestApp {
 
     return failed ? 1 : 0;
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  int argc;
-  char** argv;
 };
-
-// ============================================================================
-// [Main]
-// ============================================================================
 
 int main(int argc, char* argv[]) {
   return TestApp(argc, argv).run();

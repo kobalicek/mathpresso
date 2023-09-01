@@ -12,25 +12,22 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::mpAstNodeSize]
-// ============================================================================
+// MathPresso - AstNodeSize
+// ========================
 
 struct AstNodeSize {
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
-
-  MATHPRESSO_INLINE uint32_t nodeType() const { return _nodeType; }
-  MATHPRESSO_INLINE uint32_t nodeSize() const { return _nodeSize; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
 
   uint8_t _nodeType;
   uint8_t _reserved;
   uint16_t _nodeSize;
+
+  // Accessors
+  // ---------
+
+  MATHPRESSO_INLINE uint32_t nodeType() const { return _nodeType; }
+  MATHPRESSO_INLINE uint32_t nodeSize() const { return _nodeSize; }
 };
 
 #define ROW(type, size) { type, 0, static_cast<uint8_t>(size) }
@@ -47,9 +44,8 @@ static const AstNodeSize mpAstNodeSize[] = {
 };
 #undef ROW
 
-// ============================================================================
-// [mathpresso::AstBuilder - Construction / Destruction]
-// ============================================================================
+// MathPresso - AstBuilder
+// =======================
 
 AstBuilder::AstBuilder(ZoneAllocator* allocator)
   : _allocator(allocator),
@@ -57,10 +53,6 @@ AstBuilder::AstBuilder(ZoneAllocator* allocator)
     _programNode(NULL),
     _numSlots(0) {}
 AstBuilder::~AstBuilder() {}
-
-// ============================================================================
-// [mathpresso::AstBuilder - Factory]
-// ============================================================================
 
 AstScope* AstBuilder::newScope(AstScope* parent, uint32_t scopeType) {
   void* p = _allocator->alloc(sizeof(AstScope));
@@ -149,10 +141,6 @@ void AstBuilder::deleteNode(AstNode* node) {
   _allocator->release(node, mpAstNodeSize[nodeType].nodeSize());
 }
 
-// ============================================================================
-// [mathpresso::AstBuilder - Initialization]
-// ============================================================================
-
 Error AstBuilder::initProgramScope() {
   if (_rootScope == NULL) {
     _rootScope = newScope(NULL, kAstScopeGlobal);
@@ -167,17 +155,12 @@ Error AstBuilder::initProgramScope() {
   return kErrorOk;
 }
 
-// ============================================================================
-// [mathpresso::AstBuilder - Dump]
-// ============================================================================
-
 Error AstBuilder::dump(String& sb) {
   return AstDump(this, sb).onProgram(programNode());
 }
 
-// ============================================================================
-// [mathpresso::AstScope - Construction / Destruction]
-// ============================================================================
+// MathPresso - AstScope
+// =====================
 
 struct AstScopeReleaseHandler {
   MATHPRESSO_INLINE AstScopeReleaseHandler(AstBuilder* ast) : _ast(ast) {}
@@ -197,10 +180,6 @@ AstScope::~AstScope() {
   _symbols.reset(handler);
 }
 
-// ============================================================================
-// [mathpresso::AstScope - Ops]
-// ============================================================================
-
 AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hashCode, AstScope** scopeOut) {
   AstScope* scope = this;
   AstSymbol* symbol;
@@ -215,9 +194,8 @@ AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hashCode, Ast
   return symbol;
 }
 
-// ============================================================================
-// [mathpresso::AstNode - Ops]
-// ============================================================================
+// MathPresso - AstNode
+// ====================
 
 AstNode* AstNode::replaceNode(AstNode* refNode, AstNode* node) {
   MATHPRESSO_ASSERT(refNode != NULL);
@@ -298,9 +276,8 @@ AstNode* AstNode::injectAt(uint32_t index, AstUnary* node) {
   return child;
 }
 
-// ============================================================================
-// [mathpresso::AstBlock - Ops]
-// ============================================================================
+// MathPresso - AstBlock
+// =====================
 
 static Error mpBlockNodeGrow(AstBlock* self) {
   size_t oldCapacity = self->_capacity;
@@ -392,17 +369,12 @@ AstNode* AstBlock::removeAt(uint32_t index) {
   return oldNode;
 }
 
-// ============================================================================
-// [mathpresso::AstVisitor - Construction / Destruction]
-// ============================================================================
+// MathPresso - AstVisitor
+// =======================
 
 AstVisitor::AstVisitor(AstBuilder* ast)
   : _ast(ast) {}
 AstVisitor::~AstVisitor() {}
-
-// ============================================================================
-// [mathpresso::AstVisitor - OnNode]
-// ============================================================================
 
 Error AstVisitor::onNode(AstNode* node) {
   switch (node->nodeType()) {
@@ -424,19 +396,14 @@ Error AstVisitor::onProgram(AstProgram* node) {
   return onBlock(node);
 }
 
-// ============================================================================
-// [mathpresso::AstDump - Construction / Destruction]
-// ============================================================================
+// MathPresso - AstDump
+// ====================
 
 AstDump::AstDump(AstBuilder* ast, String& sb)
   : AstVisitor(ast),
     _sb(sb),
     _level(0) {}
 AstDump::~AstDump() {}
-
-// ============================================================================
-// [mathpresso::AstDump - OnNode]
-// ============================================================================
 
 Error AstDump::onBlock(AstBlock* node) {
   AstNode** children = node->children();
@@ -490,10 +457,6 @@ Error AstDump::onCall(AstCall* node) {
   return denest();
 }
 
-// ============================================================================
-// [mathpresso::AstDump - Helpers]
-// ============================================================================
-
 Error AstDump::info(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -527,4 +490,4 @@ Error AstDump::denest() {
   return kErrorOk;
 }
 
-} // mathpresso namespace
+} // {mathpresso}

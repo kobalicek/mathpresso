@@ -14,19 +14,14 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [Forward Declaration]
-// ============================================================================
-
 struct AstBuilder;
 struct AstBlock;
 struct AstNode;
 struct AstProgram;
 struct AstVar;
 
-// ============================================================================
-// [mathpresso::Parser]
-// ============================================================================
+// MathPresso - Parser
+// ===================
 
 struct Parser {
   MATHPRESSO_NONCOPYABLE(Parser)
@@ -37,9 +32,17 @@ struct Parser {
     kEnableNestedBlock = 0x02
   };
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  AstBuilder* _ast;
+  ErrorReporter* _errorReporter;
+
+  AstScope* _currentScope;
+  Tokenizer _tokenizer;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE Parser(AstBuilder* ast, ErrorReporter* errorReporter, const char* body, size_t size)
     : _ast(ast),
@@ -48,15 +51,13 @@ struct Parser {
       _tokenizer(body, size) {}
   MATHPRESSO_INLINE ~Parser() {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstScope* currentScope() const { return _currentScope; }
 
-  // --------------------------------------------------------------------------
-  // [Parse]
-  // --------------------------------------------------------------------------
+  // Parse
+  // -----
 
   MATHPRESSO_NOAPI Error parseProgram(AstProgram* block);
 
@@ -66,19 +67,9 @@ struct Parser {
   MATHPRESSO_NOAPI Error parseVariableDecl(AstBlock* block);
   MATHPRESSO_NOAPI Error parseExpression(AstNode** pNodeOut, bool isNested);
   MATHPRESSO_NOAPI Error parseCall(AstNode** pNodeOut);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  AstBuilder* _ast;
-  ErrorReporter* _errorReporter;
-
-  AstScope* _currentScope;
-  Tokenizer _tokenizer;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPPARSER_P_H

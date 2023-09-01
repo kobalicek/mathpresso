@@ -12,21 +12,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::Parser - Syntax Error]
-// ============================================================================
-
-#define MATHPRESSO_PARSER_ERROR(_Token_, ...) \
-  return _errorReporter->onError( \
-    kErrorInvalidSyntax, static_cast<uint32_t>((size_t)(_Token_.position())), __VA_ARGS__)
-
-#define MATHPRESSO_PARSER_WARNING(_Token_, ...) \
-  _errorReporter->onWarning( \
-    static_cast<uint32_t>((size_t)(_Token_.position())), __VA_ARGS__)
-
-// ============================================================================
-// [mathpresso::AstNestedScope]
-// ============================================================================
+// MathPresso - AstNestedScope
+// ===========================
 
 //! \internal
 //!
@@ -34,9 +21,13 @@ namespace mathpresso {
 struct AstNestedScope : public AstScope {
   MATHPRESSO_NONCOPYABLE(AstNestedScope)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  Parser* _parser;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstNestedScope(Parser* parser)
     : AstScope(parser->_ast, parser->_currentScope, kAstScopeNested),
@@ -51,17 +42,21 @@ struct AstNestedScope : public AstScope {
     _parser->_currentScope = p;
     p->_symbols.mergeToInvisibleSlot(this->_symbols);
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  Parser* _parser;
 };
 
-// ============================================================================
-// [mathpresso::Parser - Parse]
-// ============================================================================
+// MathPresso - Parser Errors
+// ==========================
+
+#define MATHPRESSO_PARSER_ERROR(_Token_, ...) \
+  return _errorReporter->onError( \
+    kErrorInvalidSyntax, static_cast<uint32_t>((size_t)(_Token_.position())), __VA_ARGS__)
+
+#define MATHPRESSO_PARSER_WARNING(_Token_, ...) \
+  _errorReporter->onWarning( \
+    static_cast<uint32_t>((size_t)(_Token_.position())), __VA_ARGS__)
+
+// MathPresso - Parser
+// ===================
 
 Error Parser::parseProgram(AstProgram* block) {
   for (;;) {
@@ -681,4 +676,4 @@ Error Parser::parseCall(AstNode** pNodeOut) {
   }
 }
 
-} // mathpresso namespace
+} // {mathpresso}

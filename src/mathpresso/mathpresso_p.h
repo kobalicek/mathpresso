@@ -29,9 +29,8 @@
 # endif // _MSC_VER >= 1400
 #endif // _MSC_VER
 
-// ============================================================================
-// [mathpresso::Architecture]
-// ============================================================================
+// MathPresso Architecture
+// =======================
 
 #if (defined(_M_X64  ) || defined(__x86_64) || defined(__x86_64__) || \
      defined(_M_AMD64) || defined(__amd64 ) || defined(__amd64__ ))
@@ -68,9 +67,8 @@
 # define MATHPRESSO_ARCH_LE           (1)
 #endif
 
-// ============================================================================
-// [MathPresso::Likely / Unlikely]
-// ============================================================================
+// MathPresso Likely & Unlikely
+// ============================
 
 #if defined(__GNUC__) || defined(__clang__)
 # define MATHPRESSO_LIKELY(exp) __builtin_expect(!!(exp), 1)
@@ -80,9 +78,8 @@
 # define MATHPRESSO_UNLIKELY(exp) exp
 #endif
 
-// ============================================================================
-// [MathPresso::Error Handling]
-// ============================================================================
+// MathPresso  Error Handling
+// ==========================
 
 //! \internal
 #define MATHPRESSO_ASSERT(exp) do { \
@@ -132,15 +129,7 @@
 #define MATHPRESSO_TRACE_ERROR(error) \
   ::mathpresso::mpTraceError(error)
 
-// ============================================================================
-// [mathpresso::]
-// ============================================================================
-
 namespace mathpresso {
-
-// ============================================================================
-// [Reuse]
-// ============================================================================
 
 // Reuse these classes - we depend on asmjit anyway and these are internal.
 using asmjit::String;
@@ -150,9 +139,8 @@ using asmjit::Zone;
 using asmjit::ZoneVector;
 using asmjit::ZoneAllocator;
 
-// ============================================================================
-// [mathpresso::OpType]
-// ============================================================================
+// MathPresso OpType
+// =================
 
 //! \internal
 //!
@@ -221,9 +209,8 @@ enum OpType {
   kOpCount
 };
 
-// ============================================================================
-// [mathpresso::OpFlags]
-// ============================================================================
+// MathPresso OpFlags
+// ==================
 
 //! Operator flags.
 enum OpFlags {
@@ -257,17 +244,15 @@ enum OpFlags {
   kOpFlagNopIfOne      = kOpFlagNopIfLOne  | kOpFlagNopIfROne
 };
 
-// ============================================================================
-// [mpsl::InternalConsts]
-// ============================================================================
+// MathPresso Internal Consts
+// ==========================
 
 enum InternalConsts {
   kInvalidSlot = 0xFFFFFFFFu
 };
 
-// ============================================================================
-// [mpsl::InternalOptions]
-// ============================================================================
+// MathPresso Internal Options
+// ===========================
 
 //! \internal
 //!
@@ -277,36 +262,41 @@ enum InternalOptions {
   kInternalOptionLog = 0x00010000
 };
 
-// ============================================================================
-// [mathpresso::mpAssertionFailure]
-// ============================================================================
+// MathPresso - Assertions
+// =======================
 
 //! \internal
 //!
 //! MathPresso assertion handler.
 MATHPRESSO_NOAPI void mpAssertionFailure(const char* file, int line, const char* msg);
 
-// ============================================================================
-// [mathpresso::mpTraceError]
-// ============================================================================
+// MathPresso - Tracing
+// ====================
 
 MATHPRESSO_NOAPI Error mpTraceError(Error error);
 
-// ============================================================================
-// [mpsl::OpInfo]
-// ============================================================================
+// MathPresso - OpInfo
+// ===================
 
 //! Operator information.
 struct OpInfo {
-  // --------------------------------------------------------------------------
-  // [Statics]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  uint8_t type;
+  uint8_t altType;
+  uint8_t precedence;
+  uint8_t reserved;
+  uint32_t flags;
+  char name[12];
+
+  // Statics
+  // -------
 
   static MATHPRESSO_INLINE const OpInfo& get(uint32_t opType);
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE bool isUnary() const { return (flags & kOpFlagUnary) != 0; }
   MATHPRESSO_INLINE bool isBinary() const { return (flags & kOpFlagBinary) != 0; }
@@ -327,17 +317,6 @@ struct OpInfo {
   MATHPRESSO_INLINE bool rightAssociate(uint32_t rPrec) const {
     return precedence > rPrec || (precedence == rPrec && isRightToLeft());
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  uint8_t type;
-  uint8_t altType;
-  uint8_t precedence;
-  uint8_t reserved;
-  uint32_t flags;
-  char name[12];
 };
 extern const OpInfo mpOpInfo[kOpCount];
 
@@ -346,9 +325,8 @@ MATHPRESSO_INLINE const OpInfo& OpInfo::get(uint32_t op) {
   return mpOpInfo[op];
 }
 
-// ============================================================================
-// [mathpresso::StringRef]
-// ============================================================================
+// MathPresso - StringRef
+// ======================
 
 //! String reference (pointer to string data data and size).
 //!
@@ -356,9 +334,14 @@ MATHPRESSO_INLINE const OpInfo& OpInfo::get(uint32_t op) {
 //! the other hand MATHPRESSO doesn't require NULL terminated strings when passed
 //! to MATHPRESSO APIs.
 struct StringRef {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  const char* _data;
+  size_t _size;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE StringRef()
     : _data(NULL),
@@ -372,9 +355,8 @@ struct StringRef {
     : _data(data),
       _size(size) {}
 
-  // --------------------------------------------------------------------------
-  // [Reset / Setup]
-  // --------------------------------------------------------------------------
+  // Reset & Setup
+  // -------------
 
   MATHPRESSO_INLINE void reset() {
     set(NULL, 0);
@@ -389,18 +371,16 @@ struct StringRef {
     _size = size;
   }
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   //! Get the string data.
   MATHPRESSO_INLINE const char* data() const { return _data; }
   //! Get the string size.
   MATHPRESSO_INLINE size_t size() const { return _size; }
 
-  // --------------------------------------------------------------------------
-  // [Eq]
-  // --------------------------------------------------------------------------
+  // Equality
+  // --------
 
   MATHPRESSO_INLINE bool eq(const char* s) const {
     const char* a = _data;
@@ -417,21 +397,25 @@ struct StringRef {
   MATHPRESSO_INLINE bool eq(const char* s, size_t size) const {
     return size == _size && ::memcmp(_data, s, size) == 0;
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  const char* _data;
-  size_t _size;
 };
 
-// ============================================================================
-// [mpsl::ErrorReporter]
-// ============================================================================
+// MathPresso - Error Reporter
+// ===========================
 
 //! Error reporter.
 struct ErrorReporter {
+  // Members
+  // -------
+
+  const char* _body;
+  size_t _size;
+
+  uint32_t _options;
+  OutputLog* _log;
+
+  // Construction & Destruction
+  // --------------------------
+
   MATHPRESSO_INLINE ErrorReporter(const char* body, size_t size, uint32_t options, OutputLog* log)
     : _body(body),
       _size(size),
@@ -443,9 +427,8 @@ struct ErrorReporter {
                       (log != NULL && (_options & kInternalOptionLog) != 0) );
   }
 
-  // --------------------------------------------------------------------------
-  // [Error Handling]
-  // --------------------------------------------------------------------------
+  // Interface
+  // ---------
 
   MATHPRESSO_INLINE bool reportsErrors() const { return (_options & kInternalOptionLog) != 0; }
   MATHPRESSO_INLINE bool reportsWarnings() const { return (_options & kOptionVerbose) != 0; }
@@ -457,18 +440,8 @@ struct ErrorReporter {
 
   Error onError(Error error, uint32_t position, const char* fmt, ...);
   Error onError(Error error, uint32_t position, const String& msg);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  const char* _body;
-  size_t _size;
-
-  uint32_t _options;
-  OutputLog* _log;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 #endif // _MATHPRESSO_MATHPRESSO_P_H

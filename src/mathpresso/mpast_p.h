@@ -13,10 +13,6 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [Forward Declarations]
-// ============================================================================
-
 struct AstBuilder;
 struct AstScope;
 struct AstSymbol;
@@ -25,9 +21,8 @@ struct AstNode;
 struct AstProgram;
 struct AstUnary;
 
-// ============================================================================
-// [mathpresso::AstScopeType]
-// ============================================================================
+// MathPresso -AstScopeType
+// ========================
 
 enum AstScopeType {
   //! Global scope.
@@ -47,9 +42,8 @@ enum AstScopeType {
   kAstScopeNested = 3
 };
 
-// ============================================================================
-// [mathpresso::AstSymbolType]
-// ============================================================================
+// MathPresso - AstSymbolType
+// ==========================
 
 //! \internal
 //!
@@ -65,9 +59,8 @@ enum AstSymbolType {
   kAstSymbolFunction
 };
 
-// ============================================================================
-// [mathpresso::AstSymbolFlags]
-// ============================================================================
+// MathPresso - AstSymbolFlags
+// ===========================
 
 enum AstSymbolFlags {
   //! The symbol was declared in global scope.
@@ -93,9 +86,8 @@ enum AstSymbolFlags {
   kAstSymbolIsAltered = 0x0010
 };
 
-// ============================================================================
-// [mathpresso::AstNodeType]
-// ============================================================================
+// MathPresso - AstNodeType
+// ========================
 
 //! \internal
 //!
@@ -104,18 +96,16 @@ enum AstNodeType {
   //! Not used.
   kAstNodeNone = 0,
 
-  // --------------------------------------------------------------------------
-  // [Block]
-  // --------------------------------------------------------------------------
+  // Block
+  // -----
 
   //! Node is `AstProgram`.
   kAstNodeProgram,
   //! Node is `AstBlock`.
   kAstNodeBlock,
 
-  // --------------------------------------------------------------------------
-  // [Variable, Immediate]
-  // --------------------------------------------------------------------------
+  // Variable & Immediate
+  // --------------------
 
   //! Node is `AstVarDecl`.
   kAstNodeVarDecl,
@@ -124,9 +114,8 @@ enum AstNodeType {
   //! Node is `AstImm`.
   kAstNodeImm,
 
-  // --------------------------------------------------------------------------
-  // [Op]
-  // --------------------------------------------------------------------------
+  // Operator & Call
+  // ---------------
 
   //! Node is `AstUnaryOp`.
   kAstNodeUnaryOp,
@@ -136,9 +125,8 @@ enum AstNodeType {
   kAstNodeCall
 };
 
-// ============================================================================
-// [mathpresso::AstNodeFlags]
-// ============================================================================
+// MathPresso - AstNodeFlags
+// =========================
 
 //! \internal
 //!
@@ -147,32 +135,44 @@ enum AstNodeFlags {
   kAstNodeHasSideEffect = 0x01
 };
 
-// ============================================================================
-// [mathpresso::AstBuilder]
-// ============================================================================
+// MathPresso - AstBuilder
+// =======================
 
 //! \internal
 struct AstBuilder {
   MATHPRESSO_NONCOPYABLE(AstBuilder)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! Zone allocator.
+  ZoneAllocator* _allocator;
+  //! String builder to build possible output messages.
+  String _sb;
+
+  //! Root scope.
+  AstScope* _rootScope;
+  //! Root node.
+  AstProgram* _programNode;
+
+  //! Number of variable slots used.
+  uint32_t _numSlots;
+
+  // Construction & Destruction
+  // --------------------------
 
   AstBuilder(ZoneAllocator* allocator);
   ~AstBuilder();
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE ZoneAllocator* allocator() const { return _allocator; }
   MATHPRESSO_INLINE AstScope* rootScope() const { return _rootScope; }
   MATHPRESSO_INLINE AstProgram* programNode() const { return _programNode; }
 
-  // --------------------------------------------------------------------------
-  // [Factory]
-  // --------------------------------------------------------------------------
+  // Factory
+  // -------
 
   AstScope* newScope(AstScope* parent, uint32_t scopeType);
   void deleteScope(AstScope* scope);
@@ -209,46 +209,66 @@ struct AstBuilder {
 
   MATHPRESSO_INLINE uint32_t newSlotId() { return _numSlots++; }
 
-  // --------------------------------------------------------------------------
-  // [Init]
-  // --------------------------------------------------------------------------
+  // Init
+  // ----
 
   Error initProgramScope();
 
-  // --------------------------------------------------------------------------
-  // [Dump]
-  // --------------------------------------------------------------------------
+  // Dump
+  // ----
 
   Error dump(String& sb);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Zone allocator.
-  ZoneAllocator* _allocator;
-  //! String builder to build possible output messages.
-  String _sb;
-
-  //! Root scope.
-  AstScope* _rootScope;
-  //! Root node.
-  AstProgram* _programNode;
-
-  //! Number of variable slots used.
-  uint32_t _numSlots;
 };
 
-// ============================================================================
-// [mathpresso::AstSymbol]
-// ============================================================================
+// MathPresso - AstSymbol
+// ======================
 
 struct AstSymbol : public HashNode {
   MATHPRESSO_NONCOPYABLE(AstSymbol)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! Symbol name (key).
+  const char* _name;
+  //! Symbol name size.
+  uint32_t _nameSize;
+
+  //! Type of the symbol, see \ref AstSymbolType.
+  uint8_t _symbolType;
+  //! Operator type (if the symbol is \ref kAstSymbolIntrinsic).
+  uint8_t _opType;
+  //! Flags, see \ref AstSymbolFlags.
+  uint16_t _symbolFlags;
+
+  //! Number of times the variable is used (both read and write count).
+  uint32_t _usedCount;
+  //! Number of times the variable is written.
+  uint32_t _writeCount;
+
+  //! Node where the symbol is defined.
+  AstNode* _node;
+
+  union {
+    struct {
+      //! Variable slot id.
+      uint32_t _varSlotId;
+      //! Variable offset in data structure (in case the symbol is a global variable).
+      int32_t _varOffset;
+      //! The current value of the symbol (in case the symbol is an immediate).
+      double _value;
+    };
+
+    struct {
+      //! Function pointer (in case the symbol is a function).
+      void* _funcPtr;
+      //! Number of function arguments (in case the symbol is a function).
+      uint32_t _funcArgs;
+    };
+  };
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstSymbol(const char* name, uint32_t nameSize, uint32_t hashCode, uint32_t symbolType, uint32_t scopeType)
     : HashNode(hashCode),
@@ -262,9 +282,8 @@ struct AstSymbol : public HashNode {
       _node(nullptr),
       _value() {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE bool eq(const StringRef& s) const {
     return eq(s.data(), s.size());
@@ -364,70 +383,39 @@ struct AstSymbol : public HashNode {
 
   MATHPRESSO_INLINE void decUsedCount(uint32_t n = 1) { _usedCount -= n; }
   MATHPRESSO_INLINE void decWriteCount(uint32_t n = 1) { _writeCount -= n; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Symbol name (key).
-  const char* _name;
-  //! Symbol name size.
-  uint32_t _nameSize;
-
-  //! Type of the symbol, see \ref AstSymbolType.
-  uint8_t _symbolType;
-  //! Operator type (if the symbol is \ref kAstSymbolIntrinsic).
-  uint8_t _opType;
-  //! Flags, see \ref AstSymbolFlags.
-  uint16_t _symbolFlags;
-
-  //! Number of times the variable is used (both read and write count).
-  uint32_t _usedCount;
-  //! Number of times the variable is written.
-  uint32_t _writeCount;
-
-  //! Node where the symbol is defined.
-  AstNode* _node;
-
-  union {
-    struct {
-      //! Variable slot id.
-      uint32_t _varSlotId;
-      //! Variable offset in data structure (in case the symbol is a global variable).
-      int32_t _varOffset;
-      //! The current value of the symbol (in case the symbol is an immediate).
-      double _value;
-    };
-
-    struct {
-      //! Function pointer (in case the symbol is a function).
-      void* _funcPtr;
-      //! Number of function arguments (in case the symbol is a function).
-      uint32_t _funcArgs;
-    };
-  };
 };
 
 typedef Hash<StringRef, AstSymbol> AstSymbolHash;
 typedef HashIterator<StringRef, AstSymbol> AstSymbolHashIterator;
 
-// ============================================================================
-// [mathpresso::AstScope]
-// ============================================================================
+// MathPresso - AstScope
+// =====================
 
 struct AstScope {
   MATHPRESSO_NONCOPYABLE(AstScope)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! Context.
+  AstBuilder* _ast;
+  //! Parent scope.
+  AstScope* _parent;
+
+  //! Symbols defined in this scope.
+  AstSymbolHash _symbols;
+
+  //! Scope type, see \ref AstScopeType.
+  uint32_t _scopeType;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_NOAPI AstScope(AstBuilder* ast, AstScope* parent, uint32_t scopeType);
   MATHPRESSO_NOAPI ~AstScope();
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   //! Get the scope context.
   MATHPRESSO_INLINE AstBuilder* ast() const { return _ast; }
@@ -447,9 +435,8 @@ struct AstScope {
     _scopeType = kAstScopeShadow;
   }
 
-  // --------------------------------------------------------------------------
-  // [Ops]
-  // --------------------------------------------------------------------------
+  // Operations
+  // ----------
 
   //! Get the symbol defined only in this scope.
   MATHPRESSO_INLINE AstSymbol* getSymbol(const StringRef& name, uint32_t hashCode) {
@@ -478,26 +465,10 @@ struct AstScope {
   MATHPRESSO_NOAPI AstSymbol* removeSymbol(AstSymbol* symbol) {
     return _symbols.del(symbol);
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Context.
-  AstBuilder* _ast;
-  //! Parent scope.
-  AstScope* _parent;
-
-  //! Symbols defined in this scope.
-  AstSymbolHash _symbols;
-
-  //! Scope type, see \ref AstScopeType.
-  uint32_t _scopeType;
 };
 
-// ============================================================================
-// [mathpresso::AstNode]
-// ============================================================================
+// MathPresso - AstNode
+// ====================
 
 #define MATHPRESSO_AST_CHILD(INDEX, NODE_T, NAME, NAME_UP) \
   MATHPRESSO_INLINE NODE_T* NAME() const { return _##NAME; } \
@@ -520,9 +491,33 @@ struct AstScope {
 struct AstNode {
   MATHPRESSO_NONCOPYABLE(AstNode)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! AST builder.
+  AstBuilder* _ast;
+  //! Parent node.
+  AstNode* _parent;
+  //! Child nodes.
+  AstNode** _children;
+
+  //! Node type, see `AstNodeType`.
+  uint8_t _nodeType;
+  //! Node flags, see `AstNodeFlags`.
+  uint8_t _nodeFlags;
+  //! Node size in bytes for `ZoneAllocator`.
+  uint8_t _nodeSize;
+  //! Operator type, see `OpType`.
+  uint8_t _opType;
+
+  //! Position (in characters) to the beginning of the program (default -1).
+  uint32_t _position;
+
+  //! Count of child-nodes.
+  uint32_t _size;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstNode(AstBuilder* ast, uint32_t nodeType, AstNode** children = NULL, uint32_t size = 0)
     : _ast(ast),
@@ -537,9 +532,8 @@ struct AstNode {
 
   MATHPRESSO_INLINE void destroy(AstBuilder*) {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   //! Get the `AstBuilder` instance that created this node.
   MATHPRESSO_INLINE AstBuilder* ast() const { return _ast; }
@@ -589,9 +583,8 @@ struct AstNode {
   //! Reset source code position of the node.
   MATHPRESSO_INLINE void resetPosition() { _position = ~static_cast<uint32_t>(0); }
 
-  // --------------------------------------------------------------------------
-  // [Children]
-  // --------------------------------------------------------------------------
+  // Children
+  // --------
 
   MATHPRESSO_INLINE AstNode* childAt(uint32_t index) const {
     MATHPRESSO_ASSERT(index < _size);
@@ -607,52 +600,28 @@ struct AstNode {
   AstNode* injectNode(AstNode* refNode, AstUnary* node);
   //! Inject `node` between this node and node at index `index`.
   AstNode* injectAt(uint32_t index, AstUnary* node);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! AST builder.
-  AstBuilder* _ast;
-  //! Parent node.
-  AstNode* _parent;
-  //! Child nodes.
-  AstNode** _children;
-
-  //! Node type, see `AstNodeType`.
-  uint8_t _nodeType;
-  //! Node flags, see `AstNodeFlags`.
-  uint8_t _nodeFlags;
-  //! Node size in bytes for `ZoneAllocator`.
-  uint8_t _nodeSize;
-  //! Operator type, see `OpType`.
-  uint8_t _opType;
-
-  //! Position (in characters) to the beginning of the program (default -1).
-  uint32_t _position;
-
-  //! Count of child-nodes.
-  uint32_t _size;
 };
 
-// ============================================================================
-// [mathpresso::AstBlock]
-// ============================================================================
+// MathPresso - AstBlock
+// =====================
 
 struct AstBlock : public AstNode {
   MATHPRESSO_NONCOPYABLE(AstBlock)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  uint32_t _capacity;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstBlock(AstBuilder* ast, uint32_t nodeType = kAstNodeBlock)
     : AstNode(ast, nodeType),
       _capacity(0) {}
 
-  // --------------------------------------------------------------------------
-  // [Ops]
-  // --------------------------------------------------------------------------
+  // Operations
+  // ----------
 
   //! Reserve the capacity of the AstBlock so one more node can be added into it.
   //!
@@ -707,97 +676,84 @@ struct AstBlock : public AstNode {
   AstNode* removeNode(AstNode* node);
   //! Remove the node at index `index`.
   AstNode* removeAt(uint32_t index);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  uint32_t _capacity;
 };
 
-// ============================================================================
-// [mathpresso::AstUnary]
-// ============================================================================
+// MathPresso - AstUnary
+// =====================
 
 struct AstUnary : public AstNode {
   MATHPRESSO_NONCOPYABLE(AstUnary)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  MATHPRESSO_AST_CHILD(0, AstNode, child, Child);
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstUnary(AstBuilder* ast, uint32_t nodeType)
     : AstNode(ast, nodeType, &_child, 1),
       _child(NULL) {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstNode** children() const { return (AstNode**)&_child; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  MATHPRESSO_AST_CHILD(0, AstNode, child, Child);
 };
 
-// ============================================================================
-// [mathpresso::AstBinary]
-// ============================================================================
+// MathPresso - AstBinary
+// ======================
 
 struct AstBinary : public AstNode {
   MATHPRESSO_NONCOPYABLE(AstBinary)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  MATHPRESSO_AST_CHILD(0, AstNode, left, Left);
+  MATHPRESSO_AST_CHILD(1, AstNode, right, Right);
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstBinary(AstBuilder* ast, uint32_t nodeType)
     : AstNode(ast, nodeType, &_left, 2),
       _left(NULL),
       _right(NULL) {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstNode** children() const { return (AstNode**)&_left; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  MATHPRESSO_AST_CHILD(0, AstNode, left, Left);
-  MATHPRESSO_AST_CHILD(1, AstNode, right, Right);
 };
 
-// ============================================================================
-// [mathpresso::AstProgram]
-// ============================================================================
+// MathPresso - AstProgram
+// =======================
 
 struct AstProgram : public AstBlock {
   MATHPRESSO_NONCOPYABLE(AstProgram)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstProgram(AstBuilder* ast)
     : AstBlock(ast, kAstNodeProgram) {}
 };
 
-// ============================================================================
-// [mathpresso::AstVarDecl]
-// ============================================================================
+// MathPresso - AstVarDecl
+// =======================
 
 struct AstVarDecl : public AstUnary {
   MATHPRESSO_NONCOPYABLE(AstVarDecl)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  AstSymbol* _symbol;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstVarDecl(AstBuilder* ast)
     : AstUnary(ast, kAstNodeVarDecl),
@@ -808,103 +764,84 @@ struct AstVarDecl : public AstUnary {
       symbol()->decUsedCount();
   }
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstSymbol* symbol() const { return _symbol; }
   MATHPRESSO_INLINE void setSymbol(AstSymbol* symbol) { _symbol = symbol; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  AstSymbol* _symbol;
 };
 
-// ============================================================================
-// [mathpresso::AstVar]
-// ============================================================================
+// MathPresso - AstVar
+// ===================
 
 struct AstVar : public AstNode {
   MATHPRESSO_NONCOPYABLE(AstVar)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  AstSymbol* _symbol;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstVar(AstBuilder* ast)
     : AstNode(ast, kAstNodeVar),
       _symbol(NULL) {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstSymbol* symbol() const { return _symbol; }
   MATHPRESSO_INLINE void setSymbol(AstSymbol* symbol) { _symbol = symbol; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  AstSymbol* _symbol;
 };
 
-// ============================================================================
-// [mathpresso::AstImm]
-// ============================================================================
+// MathPresso - AstImm
+// ===================
 
 struct AstImm : public AstNode {
   MATHPRESSO_NONCOPYABLE(AstImm)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  double _value;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstImm(AstBuilder* ast, double value = 0.0)
     : AstNode(ast, kAstNodeImm),
       _value(value) {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE double value() const { return _value; }
   MATHPRESSO_INLINE void setValue(double value) { _value = value; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  double _value;
 };
 
-// ============================================================================
-// [mathpresso::AstUnaryOp]
-// ============================================================================
+// MathPresso - AstUnaryOp
+// =======================
 
 struct AstUnaryOp : public AstUnary {
   MATHPRESSO_NONCOPYABLE(AstUnaryOp)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstUnaryOp(AstBuilder* ast, uint32_t opType)
     : AstUnary(ast, kAstNodeUnaryOp) { setOpType(opType); }
 };
 
-// ============================================================================
-// [mathpresso::AstBinaryOp]
-// ============================================================================
+// MathPresso - AstBinaryOp
+// ========================
 
 struct AstBinaryOp : public AstBinary {
   MATHPRESSO_NONCOPYABLE(AstBinaryOp)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstBinaryOp(AstBuilder* ast, uint32_t opType)
     : AstBinary(ast, kAstNodeBinaryOp) { setOpType(opType); }
@@ -918,58 +855,55 @@ struct AstBinaryOp : public AstBinary {
   }
 };
 
-// ============================================================================
-// [mathpresso::AstCall]
-// ============================================================================
+// MathPresso - AstCall
+// ====================
 
 struct AstCall : public AstBlock {
   MATHPRESSO_NONCOPYABLE(AstCall)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  AstSymbol* _symbol;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE AstCall(AstBuilder* ast)
     : AstBlock(ast, kAstNodeCall),
       _symbol(NULL) {}
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstSymbol* symbol() const { return _symbol; }
   MATHPRESSO_INLINE void setSymbol(AstSymbol* symbol) { _symbol = symbol; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  AstSymbol* _symbol;
 };
 
-// ============================================================================
-// [mathpresso::AstVisitor]
-// ============================================================================
+// MathPresso - AstVisitor
+// =======================
 
 struct AstVisitor {
   MATHPRESSO_NONCOPYABLE(AstVisitor)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  AstBuilder* _ast;
+
+  // Construction & Destruction
+  // --------------------------
 
   AstVisitor(AstBuilder* ast);
   virtual ~AstVisitor();
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE AstBuilder* ast() const { return _ast; }
 
-  // --------------------------------------------------------------------------
-  // [OnNode]
-  // --------------------------------------------------------------------------
+  // OnNode
+  // ------
 
   virtual Error onNode(AstNode* node);
 
@@ -981,31 +915,28 @@ struct AstVisitor {
   virtual Error onUnaryOp(AstUnaryOp* node) = 0;
   virtual Error onBinaryOp(AstBinaryOp* node) = 0;
   virtual Error onCall(AstCall* node) = 0;
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  AstBuilder* _ast;
 };
 
-// ============================================================================
-// [mathpresso::AstDump]
-// ============================================================================
+// MathPresso - AstDump
+// ====================
 
 struct AstDump : public AstVisitor {
   MATHPRESSO_NONCOPYABLE(AstDump)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  String& _sb;
+  uint32_t _level;
+
+  // Construction & Destruction
+  // --------------------------
 
   AstDump(AstBuilder* ast, String& sb);
   virtual ~AstDump();
 
-  // --------------------------------------------------------------------------
-  // [OnNode]
-  // --------------------------------------------------------------------------
+  // OnNode
+  // ------
 
   virtual Error onBlock(AstBlock* node);
   virtual Error onVarDecl(AstVarDecl* node);
@@ -1015,23 +946,15 @@ struct AstDump : public AstVisitor {
   virtual Error onBinaryOp(AstBinaryOp* node);
   virtual Error onCall(AstCall* node);
 
-  // --------------------------------------------------------------------------
-  // [Helpers]
-  // --------------------------------------------------------------------------
+  // Helpers
+  // -------
 
   Error info(const char* fmt, ...);
   Error nest(const char* fmt, ...);
   Error denest();
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  String& _sb;
-  uint32_t _level;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPAST_P_H

@@ -16,18 +16,16 @@ namespace mathpresso {
 
 using namespace asmjit;
 
-// ============================================================================
-// [mathpresso::JitGlobal]
-// ============================================================================
+// MathPresso - JIT Globals
+// ========================
 
 struct JitGlobal {
   JitRuntime runtime;
 };
 static JitGlobal jitGlobal;
 
-// ============================================================================
-// [mathpresso::JitUtils]
-// ============================================================================
+// MathPresso - JIT Utilities
+// ==========================
 
 struct JitUtils {
   static void* funcByOp(uint32_t op) {
@@ -77,9 +75,8 @@ struct JitUtils {
   }
 };
 
-// ============================================================================
-// [mathpresso::JitVar]
-// ============================================================================
+// MathPresso - JIT Variable
+// =========================
 
 struct MATHPRESSO_NOAPI JitVar {
   enum FLAGS {
@@ -127,9 +124,8 @@ struct MATHPRESSO_NOAPI JitVar {
   uint32_t _flags;
 };
 
-// ============================================================================
-// [mathpresso::JitCompiler]
-// ============================================================================
+// MathPresso - JIT Compiler
+// =========================
 
 struct MATHPRESSO_NOAPI JitCompiler {
   JitCompiler(ZoneAllocator* allocator, x86::Compiler* c);
@@ -550,7 +546,7 @@ emitInst: {
       vl = writableVar(vl);
       vr = registerVar(vr);
 
-      cc->movsd(result, vl.xmm());
+      cc->movapd(result, vl.xmm());
       cc->divsd(vl.xmm(), vr.xmm());
       inlineRound(vl.xmm(), vl.xmm(), kOpTrunc);
       cc->mulsd(vl.xmm(), vr.xmm());
@@ -610,7 +606,7 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
       cc->roundsd(tmp, src, x86::RoundImm::kDown | x86::RoundImm::kSuppress);
 
       if (dst.id() != src.id())
-        cc->movsd(dst, src);
+        cc->movapd(dst, src);
 
       cc->subsd(dst, tmp);
       cc->cmpsd(dst, getConstantD64(0.5).mem(), x86::CmpImm::kNLT);
@@ -646,12 +642,12 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   if (op == kOpRoundEven) {
     x86::Xmm tmp = cc->newXmmSd();
 
-    cc->movsd(tmp, src);
+    cc->movapd(tmp, src);
     cc->cmpsd(tmp, getConstantD64(maxn).mem(), x86::CmpImm::kLT);
     cc->andpd(tmp, getConstantD64Aligned(magic0).mem());
 
     if (dst.id() != src.id())
-      cc->movsd(dst, src);
+      cc->movapd(dst, src);
 
     cc->addsd(dst, tmp);
     cc->subsd(dst, tmp);
@@ -666,18 +662,18 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
     x86::Xmm t2 = cc->newXmmSd();
     x86::Xmm t3 = cc->newXmmSd();
 
-    cc->movsd(t2, src);
-    cc->movsd(t3, src);
+    cc->movapd(t2, src);
+    cc->movapd(t3, src);
 
     if (dst.id() != src.id())
-      cc->movsd(dst, src);
+      cc->movapd(dst, src);
 
     switch (op) {
       case kOpRound:
         cc->addsd(t2, getConstantD64(magic0).mem());
         cc->addsd(t3, getConstantD64(magic1).mem());
 
-        cc->movsd(t1, src);
+        cc->movapd(t1, src);
         cc->subsd(t2, getConstantD64(magic0).mem());
         cc->subsd(t3, getConstantD64(magic1).mem());
 
@@ -689,7 +685,7 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
 
       case kOpFloor:
         cc->addsd(t2, getConstantD64(magic0).mem());
-        cc->movsd(t1, src);
+        cc->movapd(t1, src);
 
         cc->subsd(t2, getConstantD64(magic0).mem());
         cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
@@ -703,7 +699,7 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
 
       case kOpCeil:
         cc->addsd(t2, getConstantD64(magic0).mem());
-        cc->movsd(t1, src);
+        cc->movapd(t1, src);
 
         cc->subsd(t2, getConstantD64(magic0).mem());
         cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
@@ -723,33 +719,54 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   }
 
   if (op == kOpTrunc) {
-    x86::Xmm t1 = cc->newXmmSd();
-    x86::Xmm t2 = cc->newXmmSd();
-    x86::Xmm t3 = cc->newXmmSd();
+    if (cc->is64Bit()) {
+      // In 64-bit mode we can just do a roundtrip with CVTTSD2SI and CVTSI2SD
+      // and use such value if the floating point was not already an integer.
+      x86::Gp r = cc->newInt64();
+      x86::Xmm t = cc->newXmmSd();
+      x86::Xmm d = dst.id() == src.id() ? cc->newXmmSd() : dst;
 
-    cc->movsd(t2, getConstantU64(0x7FFFFFFFFFFFFFFFu).mem());
-    cc->andpd(t2, src);
+      cc->cvttsd2si(r, src);
+      cc->movsd(t, getConstantU64(0x7FFFFFFFFFFFFFFFu).mem());
+      cc->andpd(t, src);
 
-    if (dst.id() != src.id())
-      cc->movsd(dst, src);
+      cc->cvtsi2sd(d, r);
+      cc->cmpsd(t, getConstantD64(maxn).mem(), x86::CmpImm::kLT);
+      cc->andpd(d, t);
+      cc->andnpd(t, src);
+      cc->orpd(d, t);
 
-    cc->movsd(t1, t2);
-    cc->addsd(t2, getConstantD64(magic0).mem());
-    cc->movsd(t3, t1);
+      if (dst.id() != d.id())
+        cc->movapd(dst, d);
+    }
+    else {
+      x86::Xmm t1 = cc->newXmmSd();
+      x86::Xmm t2 = cc->newXmmSd();
+      x86::Xmm t3 = cc->newXmmSd();
 
-    cc->subsd(t2, getConstantD64(magic0).mem());
-    cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
+      cc->movsd(t2, getConstantU64(0x7FFFFFFFFFFFFFFFu).mem());
+      cc->andpd(t2, src);
 
-    cc->cmpsd(t3, t2, x86::CmpImm::kLT);
-    cc->orpd(t1, getConstantU64AsPD(0x8000000000000000u).mem());
-    cc->andpd(t3, getConstantD64AsPD(1.0).mem());
+      if (dst.id() != src.id())
+        cc->movapd(dst, src);
 
-    cc->andpd(dst, t1);
-    cc->subpd(t2, t3);
+      cc->movapd(t1, t2);
+      cc->addsd(t2, getConstantD64(magic0).mem());
+      cc->movapd(t3, t1);
 
-    cc->andnpd(t1, t2);
-    cc->orpd(dst, t1);
+      cc->subsd(t2, getConstantD64(magic0).mem());
+      cc->cmpsd(t1, getConstantD64(maxn).mem(), x86::CmpImm::kNLT);
 
+      cc->cmpsd(t3, t2, x86::CmpImm::kLT);
+      cc->orpd(t1, getConstantU64AsPD(0x8000000000000000u).mem());
+      cc->andpd(t3, getConstantD64AsPD(1.0).mem());
+
+      cc->andpd(dst, t1);
+      cc->subpd(t2, t3);
+
+      cc->andnpd(t1, t2);
+      cc->orpd(dst, t1);
+    }
     return;
   }
 
@@ -878,4 +895,4 @@ void mpFreeFunction(void* fn) {
   jitGlobal.runtime.release(fn);
 }
 
-} // mathpresso namespace
+} // {mathpresso}

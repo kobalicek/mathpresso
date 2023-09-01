@@ -14,9 +14,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::Tokenizer]
-// ============================================================================
+// MathPresso - Tokenizer
+// ======================
 
 //! \internal
 //!
@@ -170,9 +169,8 @@ uint32_t Tokenizer::next(Token* token) {
   const uint8_t* pStart = reinterpret_cast<const uint8_t*>(_start);
   const uint8_t* pEnd = reinterpret_cast<const uint8_t*>(_end);
 
-  // --------------------------------------------------------------------------
-  // [Spaces]
-  // --------------------------------------------------------------------------
+  // Spaces
+  // ------
 
 _Repeat:
   for (;;) {
@@ -190,9 +188,8 @@ _Repeat:
   // Save the first character of the token.
   pToken = p;
 
-  // --------------------------------------------------------------------------
-  // [Number | Dot]
-  // --------------------------------------------------------------------------
+  // Number | Dot
+  // ------------
 
   if (c <= kTokenChar0x9 || c == kTokenCharDot) {
     // Parsing floating point is not that simple as it looks. To simplify the
@@ -328,9 +325,8 @@ _Repeat:
     return kTokenNumber;
   }
 
-  // --------------------------------------------------------------------------
-  // [Symbol | Keyword]
-  // --------------------------------------------------------------------------
+  // Symbol | Keyword
+  // ----------------
 
   else if (c <= kTokenCharSym) {
     // We always calculate hashCode during tokenization to improve performance.
@@ -347,18 +343,16 @@ _Repeat:
     return token->setData((size_t)(pToken - pStart), size, hashCode, mpGetKeyword(pToken, size));
   }
 
-  // --------------------------------------------------------------------------
-  // [Single-Char]
-  // --------------------------------------------------------------------------
+  // Single-Char
+  // -----------
 
   else if (c <= kTokenCharSingleCharTokenEnd) {
     _p = reinterpret_cast<const char*>(++p);
     return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, c);
   }
 
-  // --------------------------------------------------------------------------
-  // [Single-Char | Multi-Char]
-  // --------------------------------------------------------------------------
+  // Single-Char | Multi-Char
+  // ------------------------
 
   else if (c < kTokenCharSpc) {
     uint32_t c1 = (++p != pEnd) ? static_cast<uint32_t>(p[0]) : static_cast<uint32_t>(0);
@@ -455,17 +449,15 @@ _Repeat:
     return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, c);
   }
 
-  // --------------------------------------------------------------------------
-  // [Invalid]
-  // --------------------------------------------------------------------------
+  // Invalid
+  // -------
 
 _Invalid:
   _p = reinterpret_cast<const char*>(pToken);
   return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenInvalid);
 
-  // --------------------------------------------------------------------------
-  // [Comment]
-  // --------------------------------------------------------------------------
+  // Comment
+  // -------
 
 _Comment:
   for (;;) {
@@ -477,13 +469,12 @@ _Comment:
       goto _Repeat;
   }
 
-  // --------------------------------------------------------------------------
-  // [EOI]
-  // --------------------------------------------------------------------------
+  // End of Input
+  // ------------
 
 _EndOfInput:
   _p = _end;
   return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenEnd);
 }
 
-} // mathpresso namespace
+} // {mathpresso}

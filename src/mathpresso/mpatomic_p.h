@@ -13,9 +13,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::mpAtomic]
-// ============================================================================
+// MathPresso - Atomics
+// ====================
 
 //! \internal
 static MATHPRESSO_INLINE uintptr_t mpAtomicGet(const uintptr_t* atomic) {
@@ -75,7 +74,7 @@ MATHPRESSO_INLINE T mpAtomicSetXchgT(T* atomic, T value) {
   return (T)mpAtomicSetXchg((uintptr_t *)atomic, (uintptr_t)value);
 }
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPATOMIC_P_H

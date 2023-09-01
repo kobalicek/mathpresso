@@ -14,9 +14,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::Token]
-// ============================================================================
+// MathPress - Token Type
+// ======================
 
 //! \internal
 //!
@@ -93,17 +92,29 @@ enum TokenType {
   kTokenEnd           // <end>
 };
 
-// ============================================================================
-// [mathpresso::Token]
-// ============================================================================
+// MathPress - Token
+// =================
 
 //! \internal
 //!
 //! Token.
 struct Token {
-  // --------------------------------------------------------------------------
-  // [Reset]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! Token type.
+  uint32_t _tokenType;
+  //! Token hash-code (only if the token is symbol or keyword).
+  uint32_t _hashCode;
+  //! Token position from the beginning of the input.
+  size_t _position;
+  //! Token size.
+  size_t _size;
+  //! Token value (if the token is a number).
+  double _value;
+
+  // Reset
+  // -----
 
   MATHPRESSO_INLINE void reset() {
     _position = 0;
@@ -112,9 +123,8 @@ struct Token {
     _tokenType = kTokenInvalid;
   }
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   inline uint32_t setData(size_t position, size_t size, uint32_t hashCode, uint32_t tokenType) {
     _position = position;
@@ -137,28 +147,26 @@ struct Token {
   }
 
   inline double value() const noexcept { return _value; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  uint32_t _tokenType;                   //!< Token type.
-  uint32_t _hashCode;                    //!< Token hash-code (only if the token is symbol or keyword).
-  size_t _position;                      //!< Token position from the beginning of the input.
-  size_t _size;                          //!< Token size.
-  double _value;                         //!< Token value (if the token is a number).
 };
 
-// ============================================================================
-// [mathpresso::Tokenizer]
-// ============================================================================
+// MathPresso - Tokenizer
+// ======================
 
 struct Tokenizer {
   MATHPRESSO_NONCOPYABLE(Tokenizer)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  const char* _p;
+  const char* _start;
+  const char* _end;
+
+  StrToD _strtod;
+  Token _token;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE Tokenizer(const char* str, size_t size)
     : _p(str),
@@ -168,9 +176,8 @@ struct Tokenizer {
     _token.reset();
   }
 
-  // --------------------------------------------------------------------------
-  // [Ops]
-  // --------------------------------------------------------------------------
+  // Operations
+  // ----------
 
   //! Get the current token.
   uint32_t peek(Token* token);
@@ -204,20 +211,9 @@ struct Tokenizer {
     consume();
     return next(token);
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  const char* _p;
-  const char* _start;
-  const char* _end;
-
-  StrToD _strtod;
-  Token _token;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPTOKENIZER_P_H

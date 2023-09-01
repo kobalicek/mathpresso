@@ -13,9 +13,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::HashUtils]
-// ============================================================================
+// MathPresso - HashUtils
+// ======================
 
 namespace HashUtils {
   // \internal
@@ -42,9 +41,8 @@ namespace HashUtils {
   MATHPRESSO_NOAPI uint32_t closestPrime(uint32_t x);
 };
 
-// ============================================================================
-// [mathpresso::HashNode]
-// ============================================================================
+// MathPresso - HashNode
+// =====================
 
 struct HashNode {
   MATHPRESSO_INLINE HashNode(uint32_t hashCode = 0) : _next(NULL), _hashCode(hashCode) {}
@@ -55,9 +53,8 @@ struct HashNode {
   uint32_t _hashCode;
 };
 
-// ============================================================================
-// [mathpresso::HashBase]
-// ============================================================================
+// MathPresso - HashBase
+// =====================
 
 struct HashBase {
   MATHPRESSO_NONCOPYABLE(HashBase)
@@ -67,9 +64,20 @@ struct HashBase {
     kExtraCount = 1
   };
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  ZoneAllocator* _allocator;
+
+  uint32_t _size;
+  uint32_t _bucketsCount;
+  uint32_t _bucketsGrow;
+
+  HashNode** _data;
+  HashNode* _embedded[1 + kExtraCount];
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE HashBase(ZoneAllocator* allocator) {
     _allocator = allocator;
@@ -88,39 +96,23 @@ struct HashBase {
       _allocator->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
   }
 
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
+  // Accessors
+  // ---------
 
   MATHPRESSO_INLINE ZoneAllocator* allocator() const { return _allocator; }
 
-  // --------------------------------------------------------------------------
-  // [Ops]
-  // --------------------------------------------------------------------------
+  // Operations
+  // ----------
 
   MATHPRESSO_NOAPI void _rehash(uint32_t newCount);
   MATHPRESSO_NOAPI void _mergeToInvisibleSlot(HashBase& other);
 
   MATHPRESSO_NOAPI HashNode* _put(HashNode* node);
   MATHPRESSO_NOAPI HashNode* _del(HashNode* node);
-
-  // --------------------------------------------------------------------------
-  // [Reset / Rehash]
-  // --------------------------------------------------------------------------
-
-  ZoneAllocator* _allocator;
-
-  uint32_t _size;
-  uint32_t _bucketsCount;
-  uint32_t _bucketsGrow;
-
-  HashNode** _data;
-  HashNode* _embedded[1 + kExtraCount];
 };
 
-// ============================================================================
-// [mathpresso::Hash<Key, Node>]
-// ============================================================================
+// MathPresso - Hash<Key, Node>
+// ============================
 
 //! \internal
 //!
@@ -143,16 +135,14 @@ struct HashBase {
 //! symbols and by AST to IR translator to associate IR specific data with AST.
 template<typename Key, typename Node>
 struct Hash : public HashBase {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE Hash(ZoneAllocator* allocator)
     : HashBase(allocator) {}
 
-  // --------------------------------------------------------------------------
-  // [Ops]
-  // --------------------------------------------------------------------------
+  // Operations
+  // ----------
 
   template<typename ReleaseHandler>
   void reset(ReleaseHandler& handler) {
@@ -203,9 +193,8 @@ struct Hash : public HashBase {
   MATHPRESSO_INLINE Node* del(Node* node) { return static_cast<Node*>(_del(node)); }
 };
 
-// ============================================================================
-// [mathpresso::HashIterator<Key, Node>]
-// ============================================================================
+// MathPresso - HashIterator<Key, Node>
+// ====================================
 
 template<typename Key, typename Node>
 struct HashIterator {
@@ -260,9 +249,8 @@ struct HashIterator {
   uint32_t _count;
 };
 
-// ============================================================================
-// [mathpresso::Map<Key, Value>]
-// ============================================================================
+// MathPresso - Map<Key, Value>
+// ============================
 
 //! \internal
 template<typename Key, typename Value>
@@ -287,9 +275,13 @@ struct Map {
     ZoneAllocator* _allocator;
   };
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  Hash<Key, Node> _hash;
+
+  // Construction & Destruction
+  // --------------------------
 
   MATHPRESSO_INLINE Map(ZoneAllocator* allocator)
     : _hash(allocator) {}
@@ -299,9 +291,8 @@ struct Map {
     _hash.reset(releaseHandler);
   }
 
-  // --------------------------------------------------------------------------
-  // [Ops]
-  // --------------------------------------------------------------------------
+  // Operations
+  // ----------
 
   MATHPRESSO_INLINE Value get(const Key& key) const {
     uint32_t hashCode = HashUtils::hashPointer(key);
@@ -327,11 +318,9 @@ struct Map {
 
     return kErrorOk;
   }
-
-  Hash<Key, Node> _hash;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPHASH_P_H

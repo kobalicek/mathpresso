@@ -13,23 +13,22 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mpsl::AstOptimizer]
-// ============================================================================
+// MathPresso - AstOptimizer
+// =========================
 
 struct AstOptimizer : public AstVisitor {
   MATHPRESSO_NONCOPYABLE(AstOptimizer)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  ErrorReporter* _errorReporter;
+
+  // Construction & Destruction
+  // --------------------------
 
   AstOptimizer(AstBuilder* ast, ErrorReporter* errorReporter);
   virtual ~AstOptimizer();
-
-  // --------------------------------------------------------------------------
-  // [OnNode]
-  // --------------------------------------------------------------------------
 
   virtual Error onBlock(AstBlock* node);
   virtual Error onVarDecl(AstVarDecl* node);
@@ -38,15 +37,9 @@ struct AstOptimizer : public AstVisitor {
   virtual Error onUnaryOp(AstUnaryOp* node);
   virtual Error onBinaryOp(AstBinaryOp* node);
   virtual Error onCall(AstCall* node);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  ErrorReporter* _errorReporter;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPOPTIMIZER_P_H

@@ -14,18 +14,13 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mpsl::AstOptimizer - Construction / Destruction]
-// ============================================================================
+// MathPresso - AstOptimizer
+// =========================
 
 AstOptimizer::AstOptimizer(AstBuilder* ast, ErrorReporter* errorReporter)
   : AstVisitor(ast),
     _errorReporter(errorReporter) {}
 AstOptimizer::~AstOptimizer() {}
-
-// ============================================================================
-// [mpsl::AstOptimizer - OnNode]
-// ============================================================================
 
 Error AstOptimizer::onBlock(AstBlock* node) {
   // Prevent removing nodes that are not stored in pure `AstBlock`. For example
@@ -295,4 +290,4 @@ Error AstOptimizer::onCall(AstCall* node) {
   return kErrorOk;
 }
 
-} // mathpresso namespace
+} // {mathpresso}

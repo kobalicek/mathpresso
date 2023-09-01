@@ -13,9 +13,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::Evaluation]
-// ============================================================================
+// MathPresso - Evaluation
+// =======================
 
 //! DP-FP binary representation and utilities.
 union DoubleBits {
@@ -104,6 +103,6 @@ static MATHPRESSO_INLINE double mpAtan(double x) { return ::atan(x); }
 static MATHPRESSO_INLINE double mpAtan2(double y, double x) { return ::atan2(y, x); }
 static MATHPRESSO_INLINE double mpHypot(double x, double y) { return ::hypot(x, y); }
 
-} // mathpresso namespace
+} // {mathpresso}
 
 #endif // _MATHPRESSO_MPEVAL_P_H

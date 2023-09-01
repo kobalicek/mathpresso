@@ -12,17 +12,12 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [Helpers]
-// ============================================================================
-
 static const uint32_t mpPrimeTable[] = {
   19, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593
 };
 
-// ============================================================================
-// [mathpresso::HashUtils]
-// ============================================================================
+// MathPresso - HashUtils
+// ======================
 
 uint32_t HashUtils::hashString(const char* data, size_t size) {
   if (size == 0)
@@ -50,9 +45,8 @@ uint32_t HashUtils::closestPrime(uint32_t x) {
   return p;
 }
 
-// ============================================================================
-// [mathpresso::HashBase - Reset / Rehash]
-// ============================================================================
+// MathPresso - HashBase
+// =====================
 
 void HashBase::_rehash(uint32_t newCount) {
   ZoneAllocator* allocator = _allocator;
@@ -140,10 +134,6 @@ void HashBase::_mergeToInvisibleSlot(HashBase& other) {
   }
 }
 
-// ============================================================================
-// [mathpresso::HashBase - Ops]
-// ============================================================================
-
 HashNode* HashBase::_put(HashNode* node) {
   uint32_t hMod = node->_hashCode % _bucketsCount;
   HashNode* next = _data[hMod];
@@ -179,4 +169,4 @@ HashNode* HashBase::_del(HashNode* node) {
   return NULL;
 }
 
-} // mathpresso namespace
+} // {mathpresso}

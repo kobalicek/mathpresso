@@ -27,9 +27,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::Parser]
-// ============================================================================
+// MathPresso - String to Double
+// =============================
 
 struct StrToD {
   MATHPRESSO_NONCOPYABLE(StrToD)
@@ -60,7 +59,7 @@ struct StrToD {
 #endif
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 // [Guard]
 #endif // _MATHPRESSO_MPSTRTOD_P_H

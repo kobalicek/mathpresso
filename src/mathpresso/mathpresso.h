@@ -13,9 +13,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::Configuration]
-// ============================================================================
+// MathPresso Configuration
+// ========================
 
 // DEPRECATED: Will be removed in the future.
 #if defined(MATHPRESSO_BUILD_EMBED) || defined(MATHPRESSO_BUILD_STATIC)
@@ -31,13 +30,12 @@ namespace mathpresso {
   #endif
 #endif
 
-// ============================================================================
-// [mathpresso::PPDefs]
-// ============================================================================
+// MathPresso Definitions
+// ======================
 
 //! \def MATHPRESSO_API
 //!
-//! Mathpresso API decorator.
+//! MathPresso API decorator.
 #if !defined(MATHPRESSO_STATIC)
   #if defined(_WIN32) && (defined(_MSC_VER) || defined(__MINGW32__))
     #if defined(MATHPRESSO_BUILD_EXPORT)
@@ -62,12 +60,12 @@ namespace mathpresso {
 
 //! \def MATHPRESSO_NOAPI
 //!
-//! Mathpresso hidden API decorator.
+//! MathPresso hidden API decorator.
 #define MATHPRESSO_NOAPI
 
 //! \def MATHPRESSO_INLINE
 //!
-//! Mathpresso inline decorator.
+//! MathPresso inline decorator.
 #if defined(__clang__)
   #define MATHPRESSO_INLINE inline __attribute__((__always_inline__, __visibility__("hidden")))
 #elif defined(__GNUC__)
@@ -91,16 +89,14 @@ public:
 #define MATHPRESSO_ARRAY_SIZE(array) \
   (sizeof(array) / sizeof(array[0]))
 
-// ============================================================================
-// [Forward Declarations]
-// ============================================================================
+// Forward Declarations
+// ====================
 
 struct OutputLog;
 struct Expression;
 
-// ============================================================================
-// [mathpresso::TypeDefs]
-// ============================================================================
+// MathPresso Typedefs
+// ===================
 
 //! MathPresso result type (signed integer).
 typedef unsigned int Error;
@@ -118,9 +114,8 @@ typedef double (*Arg6Func)(double, double, double, double, double, double);
 typedef double (*Arg7Func)(double, double, double, double, double, double, double);
 typedef double (*Arg8Func)(double, double, double, double, double, double, double, double);
 
-// ============================================================================
-// [mathpresso::ErrorCode]
-// ============================================================================
+// MathPresso Error Codes
+// ======================
 
 //! MathPresso error codes.
 enum ErrorCode {
@@ -144,9 +139,9 @@ enum ErrorCode {
   kErrorSymbolAlreadyExists
 };
 
-// ============================================================================
-// [mathpresso::Options]
-// ============================================================================
+
+// MathPresso Options
+// ==================
 
 //! MathPresso options.
 enum Options {
@@ -177,9 +172,8 @@ enum Options {
   _kOptionsMask = 0xFFFFu
 };
 
-// ============================================================================
-// [mathpresso::VariableFlags]
-// ============================================================================
+// MathPresso Variable Flags
+// =========================
 
 //! Variable flags.
 enum VariableFlags {
@@ -187,9 +181,8 @@ enum VariableFlags {
   kVariableRO = 0x00000001u
 };
 
-// ============================================================================
-// [mathpresso::FunctionFlags]
-// ============================================================================
+// MathPresso Function Flags
+// =========================
 
 enum FunctionFlags {
   //! Function has 0 arguments.
@@ -224,19 +217,13 @@ enum FunctionFlags {
   kFunctionNoSideEffects = 0x80000000u
 };
 
-// ============================================================================
-// [mathpresso::ContextImpl]
-// ============================================================================
+// MathPresso Context
+// ==================
 
 struct ContextImpl {
   //! Reference count (atomic).
   uintptr_t _refCount;
 };
-
-// ============================================================================
-// [mathpresso::Context]
-// ============================================================================
-
 //! MathPresso context.
 //!
 //! Context is an environment where you can add/remove constants, variables and
@@ -245,9 +232,14 @@ struct ContextImpl {
 //! (reference counting is atomic). It is possible to create one master context
 //! and use it from different threads to compile many expressions.
 struct Context {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! Private data not available to the MathPresso public API.
+  ContextImpl* _d;
+
+  // Construction & Destruction
+  // --------------------------
 
   //! Create a new `Context` instance.
   MATHPRESSO_API Context();
@@ -256,18 +248,16 @@ struct Context {
   //! Destroy the `Context` instance.
   MATHPRESSO_API ~Context();
 
-  // --------------------------------------------------------------------------
-  // [Copy / Reset]
-  // --------------------------------------------------------------------------
+  // Copy & Reset
+  // ------------
 
   //! Delete all symbols.
   MATHPRESSO_API Error reset();
   //! Assignement operator.
   MATHPRESSO_API Context& operator=(const Context& other);
 
-  // --------------------------------------------------------------------------
-  // [Interface]
-  // --------------------------------------------------------------------------
+  // Interface
+  // ---------
 
   //! Add built-in intrinsics and constants.
   MATHPRESSO_API Error addBuiltIns(void);
@@ -281,35 +271,31 @@ struct Context {
 
   //! Delete symbol from this context.
   MATHPRESSO_API Error delSymbol(const char* name);
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Private data not available to the MathPresso public API.
-  ContextImpl* _d;
 };
 
-// ============================================================================
-// [mathpresso::Expression]
-// ============================================================================
+// MathPresso Expresion
+// ====================
 
 //! MathPresso expression.
 struct Expression {
   MATHPRESSO_NONCOPYABLE(Expression)
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Members
+  // -------
+
+  //! Compiled function.
+  CompiledFunc _func;
+
+  // Construction & Destruction
+  // --------------------------
 
   //! Create a new `Expression` instance.
   MATHPRESSO_API Expression();
   //! Destroy the `Expression` instance.
   MATHPRESSO_API ~Expression();
 
-  // --------------------------------------------------------------------------
-  // [Interface]
-  // --------------------------------------------------------------------------
+  // Interface
+  // ---------
 
   //! Parse and compile a given expression.
   //!
@@ -336,18 +322,10 @@ struct Expression {
     _func(&result, data);
     return result;
   }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Compiled function.
-  CompiledFunc _func;
 };
 
-// ============================================================================
-// [mpsl::OutputLog]
-// ============================================================================
+// MathPresso OutputLog
+// ====================
 
 //! Interface that can be used to catch compiler warnings and errors.
 struct MATHPRESSO_API OutputLog {
@@ -367,20 +345,18 @@ struct MATHPRESSO_API OutputLog {
     kMessageAsm
   };
 
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
+  // Construction & Destruction
+  // --------------------------
 
   OutputLog();
   virtual ~OutputLog();
 
-  // --------------------------------------------------------------------------
-  // [Interface]
-  // --------------------------------------------------------------------------
+  // Interface
+  // ---------
 
   virtual void log(unsigned int type, unsigned int line, unsigned int column, const char* message, size_t size) = 0;
 };
 
-} // mathpresso namespace
+} // {mathpresso}
 
 #endif // _MATHPRESSO_H

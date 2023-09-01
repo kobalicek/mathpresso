@@ -22,9 +22,8 @@
 
 namespace mathpresso {
 
-// ============================================================================
-// [mathpresso::mpOpInfo]
-// ============================================================================
+// mathPresso - OpInfo
+// ===================
 
 // Operator information, precedence and association. The table is mostly based
 // on the C-language standard, but also adjusted to support MATHPRESSO specific
@@ -103,9 +102,8 @@ const OpInfo mpOpInfo[kOpCount] = {
 #undef LTR
 #undef ROW
 
-// ============================================================================
-// [mathpresso::mpAssertionFailure]
-// ============================================================================
+// MathPresso - Assertions
+// =======================
 
 void mpAssertionFailure(const char* file, int line, const char* msg) {
   fprintf(stderr,
@@ -115,17 +113,15 @@ void mpAssertionFailure(const char* file, int line, const char* msg) {
   ::abort();
 }
 
-// ============================================================================
-// [mathpresso::mpTraceError]
-// ============================================================================
+// MathPresso - Tracing
+// ====================
 
 MATHPRESSO_NOAPI Error mpTraceError(Error error) {
   return error;
 }
 
-// ============================================================================
-// [mathpresso::mpDummyFunc]
-// ============================================================================
+// MathPresso - Dummy Function
+// ===========================
 
 //! \internal
 //!
@@ -136,9 +132,8 @@ static void mpDummyFunc(double* result, void*) {
   *result = mpGetNan();
 }
 
-// ============================================================================
-// [mathpresso::ContextInternalImpl]
-// ============================================================================
+// MathPresso - Context Impl
+// =========================
 
 //! \internal
 //!
@@ -245,9 +240,8 @@ static Error mpContextMutable(Context* self, ContextInternalImpl** out) {
   }
 }
 
-// ============================================================================
-// [mathpresso::Context - Construction / Destruction]
-// ============================================================================
+// MathPresso - Context API
+// ========================
 
 Context::Context()
   : _d(const_cast<ContextImpl*>(&mpContextNull)) {}
@@ -258,10 +252,6 @@ Context::Context(const Context& other)
 Context::~Context() {
   mpContextRelease(_d);
 }
-
-// ============================================================================
-// [mathpresso::Context - Copy / Reset]
-// ============================================================================
 
 Error Context::reset() {
   mpContextRelease(
@@ -277,10 +267,6 @@ Context& Context::operator=(const Context& other) {
       &_d, mpContextAddRef(other._d)));
   return *this;
 }
-
-// ============================================================================
-// [mathpresso::Context - Interface]
-// ============================================================================
 
 struct GlobalConstant {
   char name[8];
@@ -414,16 +400,11 @@ Error Context::delSymbol(const char* name) {
   return kErrorOk;
 }
 
-// ============================================================================
-// [mathpresso::Expression - Construction / Destruction]
-// ============================================================================
+// MathPresso - Expression API
+// ===========================
 
 Expression::Expression() : _func(mpDummyFunc) {}
 Expression::~Expression() { reset(); }
-
-// ============================================================================
-// [mathpresso::Expression - Interface]
-// ============================================================================
 
 Error Expression::compile(const Context& ctx, const char* body, unsigned int options, OutputLog* log) {
   // Init options first.
@@ -491,16 +472,14 @@ void Expression::reset() {
   }
 }
 
-// ============================================================================
-// [mathpresso::OutputLog - Construction / Destruction]
-// ============================================================================
+// MathPresso - OutputLog - API
+// ============================
 
 OutputLog::OutputLog() {}
 OutputLog::~OutputLog() {}
 
-// ============================================================================
-// [mathpresso::ErrorReporter - Interface]
-// ============================================================================
+// MathPresso - Error Reporter API
+// ===============================
 
 void ErrorReporter::getLineAndColumn(uint32_t position, uint32_t& line, uint32_t& column) {
   // Should't happen, but be defensive.
@@ -583,4 +562,4 @@ Error ErrorReporter::onError(Error error, uint32_t position, const String& msg) 
   return MATHPRESSO_TRACE_ERROR(error);
 }
 
-} // mathpresso namespace
+} // {mathpresso}
