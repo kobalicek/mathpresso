@@ -192,7 +192,7 @@ JitCompiler::JitCompiler(ZoneAllocator* allocator, x86::Compiler* cc)
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::beginFunction() {
-  FuncNode* funcNode = cc->addFunc(FuncSignatureT<void, double*, double*>(CallConvId::kCDecl));
+  FuncNode* funcNode = cc->addFunc(FuncSignature::build<void, double*, double*>(CallConvId::kCDecl));
 
   varPtr = cc->newIntPtr("varPtr");
   constPtr = cc->newIntPtr("constPtr");
@@ -777,7 +777,7 @@ void JitCompiler::inlineCall(const x86::Xmm& dst, const x86::Xmm* args, uint32_t
   uint32_t i;
 
   // Use function builder to build a function prototype.
-  FuncSignatureBuilder signature;
+  FuncSignature signature;
   signature.setRetT<double>();
 
   for (i = 0; i < count; i++)
