@@ -10,7 +10,9 @@
 
 // [Dependencies]
 #include "./mathpresso.h"
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
+#include <asmjit/x86.h>
+#include <asmjit/a64.h>
 
 #include <limits.h>
 #include <math.h>
