@@ -108,11 +108,11 @@ struct MATHPRESSO_NOAPI JitVar {
 
   inline bool isNone() const noexcept { return _op.isNone(); }
   inline bool isMem() const noexcept { return _op.isMem(); }
-  inline bool isXmm() const noexcept { return _op.isReg(RegType::kX86_Xmm); }
+  inline bool isVec() const noexcept { return _op.isReg(RegType::kVec128); }
 
   inline const Operand& op() const noexcept { return _op; }
   inline const x86::Mem& mem() const noexcept { return _op.as<x86::Mem>(); }
-  inline const x86::Xmm& xmm() const noexcept { return _op.as<x86::Xmm>(); }
+  inline const x86::Vec& vec() const noexcept { return _op.as<x86::Vec>(); }
 
   inline uint32_t flags() const noexcept { return _flags; }
   inline bool isRO() const noexcept { return (_flags & FLAG_RO) != 0; }
@@ -153,8 +153,8 @@ struct MATHPRESSO_NOAPI JitCompiler {
   JitVar onCall(AstCall* node);
 
   // Helpers.
-  void inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t op);
-  void inlineCall(const x86::Xmm& dst, const x86::Xmm* args, uint32_t count, void* fn);
+  void inlineRound(const x86::Vec& dst, const x86::Vec& src, uint32_t op);
+  void inlineCall(const x86::Vec& dst, const x86::Vec* args, uint32_t count, void* fn);
 
   // Constants.
   void prepareConstPool();
@@ -192,7 +192,7 @@ JitCompiler::JitCompiler(ZoneAllocator* allocator, x86::Compiler* cc)
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::beginFunction() {
-  FuncNode* funcNode = cc->addFunc(FuncSignatureT<void, double*, double*>(CallConvId::kCDecl));
+  FuncNode* funcNode = cc->addFunc(FuncSignature::build<void, double*, double*>(CallConvId::kCDecl));
 
   varPtr = cc->newIntPtr("varPtr");
   constPtr = cc->newIntPtr("constPtr");
@@ -211,8 +211,7 @@ void JitCompiler::endFunction() {
 
 JitVar JitCompiler::copyVar(const JitVar& other, uint32_t flags) {
   JitVar v(cc->newXmmSd(), flags);
-  cc->emit(other.isXmm() ? x86::Inst::kIdMovapd : x86::Inst::kIdMovsd,
-    v.xmm(), other.op());
+  cc->emit(other.isVec() ? x86::Inst::kIdMovapd : x86::Inst::kIdMovsd, v.vec(), other.op());
   return v;
 }
 
@@ -249,8 +248,7 @@ void JitCompiler::compile(AstBlock* node, AstScope* rootScope, uint32_t numSlots
       AstSymbol* sym = it.get();
       if (sym->isGlobal() && sym->isAltered()) {
         JitVar v = varSlots[sym->varSlotId()];
-        cc->emit(x86::Inst::kIdMovsd,
-          x86::ptr(varPtr, sym->varOffset()), registerVar(v).xmm());
+        cc->emit(x86::Inst::kIdMovsd, x86::ptr(varPtr, sym->varOffset()), registerVar(v).vec());
       }
 
       it.next();
@@ -258,11 +256,11 @@ void JitCompiler::compile(AstBlock* node, AstScope* rootScope, uint32_t numSlots
   }
 
   // Return NaN if no result is given.
-  x86::Xmm var;
+  x86::Vec var;
   if (result.isNone())
-    var = registerVar(getConstantD64(mpGetNan())).xmm();
+    var = registerVar(getConstantD64(mpGetNan())).vec();
   else
-    var = registerVar(result).xmm();
+    var = registerVar(result).vec();
   cc->movsd(x86::ptr(resultPtr), var);
 
   if (numSlots != 0)
@@ -345,7 +343,7 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
       return var;
 
     case kOpNeg: {
-      x86::Xmm result = cc->newXmmSd();
+      x86::Vec result = cc->newXmmSd();
       cc->emit(x86::Inst::kIdXorpd, result, result);
       cc->emit(x86::Inst::kIdSubsd, result, var.op());
       return JitVar(result, JitVar::FLAG_NONE);
@@ -353,37 +351,37 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
 
     case kOpNot: {
       var = writableVar(var);
-      cc->cmpsd(var.xmm(), getConstantD64AsPD(0.0).mem(), x86::CmpImm::kEQ);
-      cc->andpd(var.xmm(), getConstantD64AsPD(1.0).mem());
+      cc->cmpsd(var.vec(), getConstantD64AsPD(0.0).mem(), x86::CmpImm::kEQ);
+      cc->andpd(var.vec(), getConstantD64AsPD(1.0).mem());
       return var;
     }
 
     case kOpIsNan: {
       var = writableVar(var);
-      cc->cmpsd(var.xmm(), var.xmm(), x86::CmpImm::kEQ);
-      cc->andnpd(var.xmm(), getConstantD64AsPD(1.0).mem());
+      cc->cmpsd(var.vec(), var.vec(), x86::CmpImm::kEQ);
+      cc->andnpd(var.vec(), getConstantD64AsPD(1.0).mem());
       return var;
     }
 
     case kOpIsInf: {
       var = writableVar(var);
-      cc->orpd(var.xmm(), getConstantU64AsPD(0x8000000000000000u).mem());
-      cc->cmpsd(var.xmm(), getConstantU64(0xFFF0000000000000u).mem(), x86::CmpImm::kEQ);
-      cc->andpd(var.xmm(), getConstantD64AsPD(1.0).mem());
+      cc->orpd(var.vec(), getConstantU64AsPD(0x8000000000000000u).mem());
+      cc->cmpsd(var.vec(), getConstantU64(0xFFF0000000000000u).mem(), x86::CmpImm::kEQ);
+      cc->andpd(var.vec(), getConstantD64AsPD(1.0).mem());
       return var;
     }
 
     case kOpIsFinite: {
       var = writableVar(var);
-      cc->orpd(var.xmm(), getConstantU64AsPD(0x8000000000000000u).mem());
-      cc->cmpsd(var.xmm(), getConstantD64(0.0).mem(), x86::CmpImm::kLE);
-      cc->andpd(var.xmm(), getConstantD64AsPD(1.0).mem());
+      cc->orpd(var.vec(), getConstantU64AsPD(0x8000000000000000u).mem());
+      cc->cmpsd(var.vec(), getConstantD64(0.0).mem(), x86::CmpImm::kLE);
+      cc->andpd(var.vec(), getConstantD64AsPD(1.0).mem());
       return var;
     }
 
     case kOpSignBit: {
-      x86::Xmm result = cc->newXmmSd();
-      cc->pshufd(result, registerVar(var).xmm(), x86::shuffleImm(3, 2, 1, 1));
+      x86::Vec result = cc->newXmmSd();
+      cc->pshufd(result, registerVar(var).vec(), x86::shuffleImm(3, 2, 1, 1));
       cc->psrad(result, 31);
       cc->andpd(result, getConstantD64AsPD(1.0).mem());
       return JitVar(result, JitVar::FLAG_NONE);
@@ -395,12 +393,12 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
     case kOpFloor:
     case kOpCeil: {
       var = writableVar(var);
-      inlineRound(var.xmm(), var.xmm(), op);
+      inlineRound(var.vec(), var.vec(), op);
       return var;
     }
 
     case kOpAbs: {
-      x86::Xmm result = cc->newXmmSd();
+      x86::Vec result = cc->newXmmSd();
       cc->emit(x86::Inst::kIdXorpd, result, result);
       cc->emit(x86::Inst::kIdSubsd, result, var.op());
       cc->emit(x86::Inst::kIdMaxsd, result, var.op());
@@ -414,14 +412,14 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
       break;
 
     case kOpSqrt: {
-      x86::Xmm result = cc->newXmmSd();
+      x86::Vec result = cc->newXmmSd();
       cc->emit(x86::Inst::kIdSqrtsd, result, var.op());
       return JitVar(result, JitVar::FLAG_NONE);
     }
 
     case kOpFrac: {
       var = writableVar(var);
-      x86::Xmm tmp = cc->newXmmSd();
+      x86::Vec tmp = cc->newXmmSd();
 
       if (enableSSE4_1) {
         cc->emit(x86::Inst::kIdRoundsd, tmp, var.op(), x86::RoundImm::kDown | x86::RoundImm::kSuppress);
@@ -430,14 +428,14 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
       }
       else {
         // Pure SSE2 `frac()`, uses the same rounding trick as `floor()`.
-        inlineRound(tmp, var.xmm(), kOpFloor);
-        cc->subsd(var.xmm(), tmp);
+        inlineRound(tmp, var.vec(), kOpFloor);
+        cc->subsd(var.vec(), tmp);
         return var;
       }
     }
 
     case kOpRecip: {
-      x86::Xmm result = cc->newXmmSd();
+      x86::Vec result = cc->newXmmSd();
       cc->emit(x86::Inst::kIdMovsd, result, getConstantD64(1.0).op());
       cc->emit(x86::Inst::kIdDivsd, result, var.op());
       return JitVar(result, JitVar::FLAG_NONE);
@@ -456,8 +454,8 @@ JitVar JitCompiler::onUnaryOp(AstUnaryOp* node) {
   }
 
   // No inline implementation -> function call.
-  x86::Xmm result = cc->newXmmSd();
-  x86::Xmm args[1] = { registerVar(var).xmm() };
+  x86::Vec result = cc->newXmmSd();
+  x86::Vec args[1] = { registerVar(var).vec() };
   inlineCall(result, args, 1, JitUtils::funcByOp(op));
 
   return JitVar(result, JitVar::FLAG_NONE);
@@ -518,8 +516,8 @@ JitVar JitCompiler::onBinaryOp(AstBinaryOp* node) {
     case kOpLe: cmpImm = x86::CmpImm::kLE ; goto emitCompare;
 emitCompare: {
       vl = writableVar(vl);
-      cc->emit(x86::Inst::kIdCmpsd, vl.xmm(), vr.op(), cmpImm);
-      cc->emit(x86::Inst::kIdAndpd, vl.xmm(), getConstantD64AsPD(1.0).op());
+      cc->emit(x86::Inst::kIdCmpsd, vl.vec(), vr.op(), cmpImm);
+      cc->emit(x86::Inst::kIdAndpd, vl.vec(), getConstantD64AsPD(1.0).op());
       return vl;
     }
 
@@ -535,22 +533,22 @@ emitInst: {
 
     case kOpAvg: {
       vl = writableVar(vl);
-      cc->emit(x86::Inst::kIdAddsd, vl.xmm(), vr.op());
-      cc->emit(x86::Inst::kIdMulsd, vl.xmm(), getConstantD64(0.5).op());
+      cc->emit(x86::Inst::kIdAddsd, vl.vec(), vr.op());
+      cc->emit(x86::Inst::kIdMulsd, vl.vec(), getConstantD64(0.5).op());
       return vl;
     }
 
     case kOpMod: {
-      x86::Xmm result = cc->newXmmSd();
+      x86::Vec result = cc->newXmmSd();
 
       vl = writableVar(vl);
       vr = registerVar(vr);
 
-      cc->movapd(result, vl.xmm());
-      cc->divsd(vl.xmm(), vr.xmm());
-      inlineRound(vl.xmm(), vl.xmm(), kOpTrunc);
-      cc->mulsd(vl.xmm(), vr.xmm());
-      cc->subsd(result, vl.xmm());
+      cc->movapd(result, vl.vec());
+      cc->divsd(vl.vec(), vr.vec());
+      inlineRound(vl.vec(), vl.vec(), kOpTrunc);
+      cc->mulsd(vl.vec(), vr.vec());
+      cc->subsd(result, vl.vec());
 
       return JitVar(result, JitVar::FLAG_NONE);
     }
@@ -564,9 +562,9 @@ emitInst: {
       vl = writableVar(vl);
       vr = writableVar(vr);
 
-      cc->andpd(vl.xmm(), getConstantU64AsPD(0x7FFFFFFFFFFFFFFFu).mem());
-      cc->andpd(vr.xmm(), getConstantU64AsPD(0x8000000000000000u).mem());
-      cc->orpd(vl.xmm(), vr.xmm());
+      cc->andpd(vl.vec(), getConstantU64AsPD(0x7FFFFFFFFFFFFFFFu).mem());
+      cc->andpd(vr.vec(), getConstantU64AsPD(0x8000000000000000u).mem());
+      cc->orpd(vl.vec(), vr.vec());
 
       return vl;
     }
@@ -577,8 +575,8 @@ emitInst: {
   }
 
   // No inline implementation -> function call.
-  x86::Xmm result = cc->newXmmSd();
-  x86::Xmm args[2] = { registerVar(vl).xmm(), registerVar(vr).xmm() };
+  x86::Vec result = cc->newXmmSd();
+  x86::Vec args[2] = { registerVar(vl).vec(), registerVar(vr).vec() };
   inlineCall(result, args, 2, JitUtils::funcByOp(op));
 
   return JitVar(result, JitVar::FLAG_NONE);
@@ -588,21 +586,21 @@ JitVar JitCompiler::onCall(AstCall* node) {
   uint32_t i, size = node->size();
   AstSymbol* sym = node->symbol();
 
-  x86::Xmm result = cc->newXmmSd();
-  x86::Xmm args[8];
+  x86::Vec result = cc->newXmmSd();
+  x86::Vec args[8];
 
   for (i = 0; i < size; i++)
-    args[i] = registerVar(onNode(node->childAt(i))).xmm();
+    args[i] = registerVar(onNode(node->childAt(i))).vec();
 
   inlineCall(result, args, size, sym->funcPtr());
   return JitVar(result, JitVar::FLAG_NONE);
 }
 
-void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t op) {
+void JitCompiler::inlineRound(const x86::Vec& dst, const x86::Vec& src, uint32_t op) {
   // SSE4.1 implementation is easy except `round()`, which is not `roundeven()`.
   if (enableSSE4_1) {
     if (op == kOpRound) {
-      x86::Xmm tmp = cc->newXmmSd();
+      x86::Vec tmp = cc->newXmmSd();
       cc->roundsd(tmp, src, x86::RoundImm::kDown | x86::RoundImm::kSuppress);
 
       if (dst.id() != src.id())
@@ -640,7 +638,7 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   const double magic1 = 6755399441055745.0;
 
   if (op == kOpRoundEven) {
-    x86::Xmm tmp = cc->newXmmSd();
+    x86::Vec tmp = cc->newXmmSd();
 
     cc->movapd(tmp, src);
     cc->cmpsd(tmp, getConstantD64(maxn).mem(), x86::CmpImm::kLT);
@@ -658,9 +656,9 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   // The `roundeven()` function can be used to implement efficiently the
   // remaining rounding functions. The easiest are `floor()` and `ceil()`.
   if (op == kOpRound || op == kOpFloor || op == kOpCeil) {
-    x86::Xmm t1 = cc->newXmmSd();
-    x86::Xmm t2 = cc->newXmmSd();
-    x86::Xmm t3 = cc->newXmmSd();
+    x86::Vec t1 = cc->newXmmSd();
+    x86::Vec t2 = cc->newXmmSd();
+    x86::Vec t3 = cc->newXmmSd();
 
     cc->movapd(t2, src);
     cc->movapd(t3, src);
@@ -723,8 +721,8 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
       // In 64-bit mode we can just do a roundtrip with CVTTSD2SI and CVTSI2SD
       // and use such value if the floating point was not already an integer.
       x86::Gp r = cc->newInt64();
-      x86::Xmm t = cc->newXmmSd();
-      x86::Xmm d = dst.id() == src.id() ? cc->newXmmSd() : dst;
+      x86::Vec t = cc->newXmmSd();
+      x86::Vec d = dst.id() == src.id() ? cc->newXmmSd() : dst;
 
       cc->cvttsd2si(r, src);
       cc->movsd(t, getConstantU64(0x7FFFFFFFFFFFFFFFu).mem());
@@ -740,9 +738,9 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
         cc->movapd(dst, d);
     }
     else {
-      x86::Xmm t1 = cc->newXmmSd();
-      x86::Xmm t2 = cc->newXmmSd();
-      x86::Xmm t3 = cc->newXmmSd();
+      x86::Vec t1 = cc->newXmmSd();
+      x86::Vec t2 = cc->newXmmSd();
+      x86::Vec t3 = cc->newXmmSd();
 
       cc->movsd(t2, getConstantU64(0x7FFFFFFFFFFFFFFFu).mem());
       cc->andpd(t2, src);
@@ -773,11 +771,11 @@ void JitCompiler::inlineRound(const x86::Xmm& dst, const x86::Xmm& src, uint32_t
   inlineCall(dst, &src, 1, (void*)(Arg1Func)mpRound);
 }
 
-void JitCompiler::inlineCall(const x86::Xmm& dst, const x86::Xmm* args, uint32_t count, void* fn) {
+void JitCompiler::inlineCall(const x86::Vec& dst, const x86::Vec* args, uint32_t count, void* fn) {
   uint32_t i;
 
   // Use function builder to build a function prototype.
-  FuncSignatureBuilder signature;
+  FuncSignature signature;
   signature.setRetT<double>();
 
   for (i = 0; i < count; i++)
