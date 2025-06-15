@@ -120,7 +120,7 @@ if (NOT MATHPRESSO_EMBED)
   target_compile_options(mathpresso PRIVATE ${MATHPRESSO_PRIVATE_CFLAGS}
     $<$<CONFIG:Debug>:${MATHPRESSO_PRIVATE_CFLAGS_DBG}>
     $<$<NOT:$<CONFIG:Debug>>:${MATHPRESSO_PRIVATE_CFLAGS_REL}>)
-  target_compile_features(mathpresso PUBLIC cxx_std_11)
+  target_compile_features(mathpresso PUBLIC cxx_std_17)
   set_property(TARGET mathpresso PROPERTY CXX_VISIBILITY_PRESET hidden)
 
   target_include_directories(mathpresso BEFORE PRIVATE ${ASMJIT_INCLUDE_DIRS})
@@ -159,7 +159,7 @@ if (MATHPRESSO_TEST)
     target_compile_options(${_target} PRIVATE ${MATHPRESSO_PRIVATE_CFLAGS}
       $<$<CONFIG:Debug>:${MATHPRESSO_PRIVATE_CFLAGS_DBG}>
       $<$<NOT:$<CONFIG:Debug>>:${MATHPRESSO_PRIVATE_CFLAGS_REL}>)
-    target_compile_features(${_target} PUBLIC cxx_std_11)
+    target_compile_features(${_target} PUBLIC cxx_std_17)
     set_property(TARGET ${_target} PROPERTY CXX_VISIBILITY_PRESET hidden)
   endforeach()
 endif()
