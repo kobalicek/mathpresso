@@ -57,10 +57,10 @@ int main() {
 
   // Create the context, add builtins and define the `Data` layout.
   mathpresso::Context ctx;
-  ctx.addBuiltIns();
-  ctx.addVariable("x", MATHPRESSO_OFFSET(Data, x));
-  ctx.addVariable("y", MATHPRESSO_OFFSET(Data, y));
-  ctx.addVariable("z", MATHPRESSO_OFFSET(Data, z));
+  ctx.add_builtins();
+  ctx.add_variable("x", MATHPRESSO_OFFSET(Data, x));
+  ctx.add_variable("y", MATHPRESSO_OFFSET(Data, y));
+  ctx.add_variable("z", MATHPRESSO_OFFSET(Data, z));
 
   // The following options will cause that MathPresso will send everything
   // it does to `OutputLog`.

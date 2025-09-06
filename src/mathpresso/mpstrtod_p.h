@@ -37,15 +37,15 @@ struct StrToD {
   MATHPRESSO_INLINE StrToD() { handle = _create_locale(LC_ALL, "C"); }
   MATHPRESSO_INLINE ~StrToD() { _free_locale(handle); }
 
-  MATHPRESSO_INLINE bool isOk() const { return handle != NULL; }
+  MATHPRESSO_INLINE bool isOk() const { return handle != nullptr; }
   MATHPRESSO_INLINE double conv(const char* s, char** end) const { return _strtod_l(s, end, handle); }
 
   _locale_t handle;
 #elif defined(MATHPRESSO_STRTOD_XLOCALE)
-  MATHPRESSO_INLINE StrToD() { handle = newlocale(LC_ALL_MASK, "C", NULL); }
+  MATHPRESSO_INLINE StrToD() { handle = newlocale(LC_ALL_MASK, "C", nullptr); }
   MATHPRESSO_INLINE ~StrToD() { freelocale(handle); }
 
-  MATHPRESSO_INLINE bool isOk() const { return handle != NULL; }
+  MATHPRESSO_INLINE bool isOk() const { return handle != nullptr; }
   MATHPRESSO_INLINE double conv(const char* s, char** end) const { return strtod_l(s, end, handle); }
 
   locale_t handle;

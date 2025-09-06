@@ -45,14 +45,14 @@ static inline void set_x87_mode(unsigned short mode) {
 // This is a copy-pase from `mpeval_p.h`, we can't include it here since it's
 // private.
 union DoubleBits {
-  static MATHPRESSO_INLINE DoubleBits fromDouble(double d) { DoubleBits u; u.d = d; return u; }
+  static MATHPRESSO_INLINE DoubleBits from_double(double d) { DoubleBits u; u.d = d; return u; }
 
-  MATHPRESSO_INLINE void setNan() { hi = 0x7FF80000u; lo = 0x00000000u; }
-  MATHPRESSO_INLINE void setInf() { hi = 0x7FF00000u; lo = 0x00000000u; }
+  MATHPRESSO_INLINE void set_nan() { hi = 0x7FF80000u; lo = 0x00000000u; }
+  MATHPRESSO_INLINE void set_inf() { hi = 0x7FF00000u; lo = 0x00000000u; }
 
-  MATHPRESSO_INLINE bool isNan() const { return (hi & 0x7FF00000u) == 0x7FF00000u && ((hi & 0x000FFFFFu) | lo) != 0x00000000u; }
-  MATHPRESSO_INLINE bool isInf() const { return (hi & 0x7FFFFFFFu) == 0x7FF00000u && lo == 0x00000000u; }
-  MATHPRESSO_INLINE bool isFinite() const { return (hi & 0x7FF00000u) != 0x7FF00000u; }
+  MATHPRESSO_INLINE bool is_nan() const { return (hi & 0x7FF00000u) == 0x7FF00000u && ((hi & 0x000FFFFFu) | lo) != 0x00000000u; }
+  MATHPRESSO_INLINE bool is_inf() const { return (hi & 0x7FFFFFFFu) == 0x7FF00000u && lo == 0x00000000u; }
+  MATHPRESSO_INLINE bool is_finite() const { return (hi & 0x7FF00000u) != 0x7FF00000u; }
 
   double d;
   struct { unsigned int lo, hi; };
@@ -121,9 +121,9 @@ struct TestApp {
   double x, y, z, big;
 
   // Functions.
-  inline double isinf(double x) { return DoubleBits::fromDouble(x).isInf() ? 1.0 : 0.0; }
-  inline double isnan(double x) { return DoubleBits::fromDouble(x).isNan() ? 1.0 : 0.0; }
-  inline double isfinite(double x) { return DoubleBits::fromDouble(x).isFinite() ? 1.0 : 0.0; }
+  inline double isinf(double x) { return DoubleBits::from_double(x).is_inf() ? 1.0 : 0.0; }
+  inline double isnan(double x) { return DoubleBits::from_double(x).is_nan() ? 1.0 : 0.0; }
+  inline double isfinite(double x) { return DoubleBits::from_double(x).is_finite() ? 1.0 : 0.0; }
 
   inline double avg(double x, double y) { return (x + y) * 0.5; }
   inline double min(double x, double y) { return x < y ? x : y; }
@@ -152,7 +152,7 @@ struct TestApp {
       z(9.9),
       big(4503599627370496.0) {}
 
-  bool hasArg(const char* arg) {
+  bool has_arg(const char* arg) {
     for (int i = 1; i < argc; i++) {
       if (::strcmp(argv[i], arg) == 0)
         return true;
@@ -163,8 +163,8 @@ struct TestApp {
 
   int run() {
     bool failed = false;
-    bool verbose = hasArg("--verbose");
-    bool debugCompiler = hasArg("--debug-compiler");
+    bool verbose = has_arg("--verbose");
+    bool debug_compiler = has_arg("--debug-compiler");
 
     // Set the FPU precision to `double` if running 32-bit. Required
     // to be able to compare the result of C++ code with JIT code.
@@ -177,14 +177,14 @@ struct TestApp {
     mathpresso::Expression e;
     TestOutputLog outputLog;
 
-    ctx.addBuiltIns();
-    ctx.addVariable("x"  , 0 * sizeof(double));
-    ctx.addVariable("y"  , 1 * sizeof(double));
-    ctx.addVariable("z"  , 2 * sizeof(double));
-    ctx.addVariable("big", 3 * sizeof(double));
+    ctx.add_builtins();
+    ctx.add_variable("x"  , 0 * sizeof(double));
+    ctx.add_variable("y"  , 1 * sizeof(double));
+    ctx.add_variable("z"  , 2 * sizeof(double));
+    ctx.add_variable("big", 3 * sizeof(double));
 
-    ctx.addFunction("custom1", (void*)custom1, mathpresso::kFunctionArg1);
-    ctx.addFunction("custom2", (void*)custom2, mathpresso::kFunctionArg2);
+    ctx.add_function("custom1", (void*)custom1, mathpresso::kFunctionArg1);
+    ctx.add_function("custom2", (void*)custom2, mathpresso::kFunctionArg2);
 
     #define TEST_INLINE(exp) { #exp, (double)(exp), { x, y, z } }
     #define TEST_STRING(str, result) { str, result, { x, y, z } }
@@ -449,7 +449,7 @@ struct TestApp {
     if (verbose)
       defaultOptions |= mathpresso::kOptionVerbose | mathpresso::kOptionDebugMachineCode;
 
-    if (debugCompiler)
+    if (debug_compiler)
       defaultOptions |= mathpresso::kOptionVerbose | mathpresso::kOptionDebugCompiler;
 
     TestOption options[] = {

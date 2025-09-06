@@ -30,17 +30,17 @@ struct AstNestedScope : public AstScope {
   // --------------------------
 
   MATHPRESSO_INLINE AstNestedScope(Parser* parser)
-    : AstScope(parser->_ast, parser->_currentScope, kAstScopeNested),
+    : AstScope(parser->_ast, parser->_current_scope, kAstScopeNested),
       _parser(parser) {
-    _parser->_currentScope = this;
+    _parser->_current_scope = this;
   }
 
   MATHPRESSO_INLINE ~AstNestedScope() {
     AstScope* p = parent();
-    MATHPRESSO_ASSERT(p != NULL);
+    MATHPRESSO_ASSERT(p != nullptr);
 
-    _parser->_currentScope = p;
-    p->_symbols.mergeToInvisibleSlot(this->_symbols);
+    _parser->_current_scope = p;
+    p->_symbols.merge_to_invisible_slot(this->_symbols);
   }
 };
 
@@ -48,17 +48,17 @@ struct AstNestedScope : public AstScope {
 // ==========================
 
 #define MATHPRESSO_PARSER_ERROR(_Token_, ...) \
-  return _errorReporter->onError( \
+  return _error_reporter->on_error( \
     kErrorInvalidSyntax, static_cast<uint32_t>((size_t)(_Token_.position())), __VA_ARGS__)
 
 #define MATHPRESSO_PARSER_WARNING(_Token_, ...) \
-  _errorReporter->onWarning( \
+  _error_reporter->on_warning( \
     static_cast<uint32_t>((size_t)(_Token_.position())), __VA_ARGS__)
 
 // MathPresso - Parser
 // ===================
 
-Error Parser::parseProgram(AstProgram* block) {
+Error Parser::parse_program(AstProgram* block) {
   for (;;) {
     Token token;
     uint32_t uToken = _tokenizer.peek(&token);
@@ -66,7 +66,7 @@ Error Parser::parseProgram(AstProgram* block) {
     // Parse the end of the input.
     if (uToken == kTokenEnd)
       break;
-    MATHPRESSO_PROPAGATE(parseStatement(block, kEnableVarDecls | kEnableNestedBlock));
+    MATHPRESSO_PROPAGATE(parse_statement(block, kEnableVarDecls | kEnableNestedBlock));
   }
 
   if (block->size() == 0)
@@ -76,7 +76,7 @@ Error Parser::parseProgram(AstProgram* block) {
 }
 
 // Parse <statement>; or { [<statement>; ...] }
-Error Parser::parseStatement(AstBlock* block, uint32_t flags) {
+Error Parser::parse_statement(AstBlock* block, uint32_t flags) {
   Token token;
   uint32_t uToken = _tokenizer.peek(&token);
 
@@ -93,27 +93,27 @@ Error Parser::parseStatement(AstBlock* block, uint32_t flags) {
     if (!(flags & kEnableNestedBlock))
       MATHPRESSO_PARSER_ERROR(token, "Cannot declare a new block-scope here.");
 
-    MATHPRESSO_PROPAGATE(block->willAdd());
-    MATHPRESSO_NULLCHECK(nested = _ast->newNode<AstBlock>());
-    block->appendNode(nested);
+    MATHPRESSO_PROPAGATE(block->will_add());
+    MATHPRESSO_NULLCHECK(nested = _ast->new_node<AstBlock>());
+    block->append_node(nested);
 
     AstNestedScope tmpScope(this);
-    return parseBlockOrStatement(nested);
+    return parse_block_or_statement(nested);
   }
 
   // Parse a variable declaration.
   if (uToken == kTokenVar) {
     if (!(flags & kEnableVarDecls))
       MATHPRESSO_PARSER_ERROR(token, "Cannot declare a new variable here.");
-    return parseVariableDecl(block);
+    return parse_variable_decl(block);
   }
 
   // Parse an expression.
   AstNode* expression;
 
-  MATHPRESSO_PROPAGATE(block->willAdd());
-  MATHPRESSO_PROPAGATE(parseExpression(&expression, false));
-  block->appendNode(expression);
+  MATHPRESSO_PROPAGATE(block->will_add());
+  MATHPRESSO_PROPAGATE(parse_expression(&expression, false));
+  block->append_node(expression);
 
   uToken = _tokenizer.peek(&token);
   if (uToken == kTokenSemicolon) {
@@ -128,12 +128,12 @@ Error Parser::parseStatement(AstBlock* block, uint32_t flags) {
 }
 
 // Parse <block|statement>;.
-Error Parser::parseBlockOrStatement(AstBlock* block) {
+Error Parser::parse_block_or_statement(AstBlock* block) {
   Token token;
   uint32_t uToken = _tokenizer.next(&token);
 
   // Parse the <block>, consume '{' token.
-  block->setPosition(token.positionAsUInt());
+  block->set_position(token.positionAsUInt());
   if (uToken == kTokenLCurl) {
     for (;;) {
       uToken = _tokenizer.peek(&token);
@@ -145,39 +145,39 @@ Error Parser::parseBlockOrStatement(AstBlock* block) {
         return kErrorOk;
       }
       else {
-        MATHPRESSO_PROPAGATE(parseStatement(block, kEnableVarDecls | kEnableNestedBlock));
+        MATHPRESSO_PROPAGATE(parse_statement(block, kEnableVarDecls | kEnableNestedBlock));
       }
     }
   }
   else {
-    return parseStatement(block, kNoFlags);
+    return parse_statement(block, kNoFlags);
   }
 }
 
 // Parse "var <name> = <expression>[, <name> = <expression>, ...];".
-Error Parser::parseVariableDecl(AstBlock* block) {
+Error Parser::parse_variable_decl(AstBlock* block) {
   Token token;
   uint32_t uToken = _tokenizer.next(&token);
   StringRef str;
 
-  bool isFirst = true;
+  bool is_first = true;
   uint32_t position = token.positionAsUInt();
 
   // Parse the 'var' keyword.
   if (uToken != kTokenVar)
     MATHPRESSO_PARSER_ERROR(token, "Expected 'var' keyword.");
 
-  AstScope* scope = _currentScope;
+  AstScope* scope = _current_scope;
   for (;;) {
     // Parse the variable name.
     if (_tokenizer.next(&token) != kTokenSymbol)
-      MATHPRESSO_PARSER_ERROR(token, isFirst
+      MATHPRESSO_PARSER_ERROR(token, is_first
         ? "Expected a variable name after 'var' keyword."
         : "Expected a variable name after colon ','.");
 
-    MATHPRESSO_PROPAGATE(block->willAdd());
+    MATHPRESSO_PROPAGATE(block->will_add());
 
-    if (!isFirst)
+    if (!is_first)
       position = token.positionAsUInt();
 
     // Resolve the variable name.
@@ -185,13 +185,13 @@ Error Parser::parseVariableDecl(AstBlock* block) {
     AstScope* vScope;
 
     str.set(_tokenizer._start + token.position(), token.size());
-    if ((vSym = scope->resolveSymbol(str, token.hashCode(), &vScope)) != NULL) {
-      if (vSym->symbolType() != kAstSymbolVariable || scope == vScope)
+    if ((vSym = scope->resolve_symbol(str, token.hash_code(), &vScope)) != nullptr) {
+      if (vSym->symbol_type() != kAstSymbolVariable || scope == vScope)
         MATHPRESSO_PARSER_ERROR(token, "Attempt to redefine '%s'.", vSym->name());
 
-      if (vSym->hasNode()) {
+      if (vSym->has_node()) {
         uint32_t line, column;
-        _errorReporter->getLineAndColumn(vSym->node()->position(), line, column);
+        _error_reporter->get_line_and_column(vSym->node()->position(), line, column);
         MATHPRESSO_PARSER_WARNING(token, "Variable '%s' shadows a variable declared at [%d:%d].", vSym->name(), line, column);
       }
       else {
@@ -199,62 +199,62 @@ Error Parser::parseVariableDecl(AstBlock* block) {
       }
     }
 
-    vSym = _ast->newSymbol(str, token.hashCode(), kAstSymbolVariable, scope->scopeType());
+    vSym = _ast->new_symbol(str, token.hash_code(), kAstSymbolVariable, scope->scope_type());
     MATHPRESSO_NULLCHECK(vSym);
-    scope->putSymbol(vSym);
+    scope->put_symbol(vSym);
 
-    AstVarDecl* decl = _ast->newNode<AstVarDecl>();
-    MATHPRESSO_NULLCHECK_(decl, { _ast->deleteSymbol(vSym); });
+    AstVarDecl* decl = _ast->new_node<AstVarDecl>();
+    MATHPRESSO_NULLCHECK_(decl, { _ast->delete_symbol(vSym); });
 
-    decl->setPosition(position);
-    decl->setSymbol(vSym);
+    decl->set_position(position);
+    decl->set_symbol(vSym);
 
     // Assign a slot and fill to safe defaults.
-    vSym->setVarOffset(0);
-    vSym->setVarSlotId(_ast->newSlotId());
-    vSym->setNode(decl);
+    vSym->set_var_offset(0);
+    vSym->set_var_slot_id(_ast->new_slot_id());
+    vSym->set_node(decl);
 
     // Parse possible assignment '='.
     uToken = _tokenizer.next(&token);
-    bool isAssigned = (uToken == kTokenAssign);
+    bool is_assigned = (uToken == kTokenAssign);
 
-    if (isAssigned) {
+    if (is_assigned) {
       AstNode* expression;
-      MATHPRESSO_PROPAGATE_(parseExpression(&expression, false), { _ast->deleteNode(decl); });
+      MATHPRESSO_PROPAGATE_(parse_expression(&expression, false), { _ast->delete_node(decl); });
 
-      decl->setChild(expression);
-      vSym->incWriteCount();
+      decl->set_child(expression);
+      vSym->increment_write_count();
 
       uToken = _tokenizer.next(&token);
     }
 
     // Make the symbol declared so it can be referenced after now.
-    vSym->setDeclared();
+    vSym->mark_declared();
 
     // Parse the ',' or ';' tokens.
     if (uToken == kTokenComma || uToken == kTokenSemicolon || uToken == kTokenEnd) {
-      block->appendNode(decl);
+      block->append_node(decl);
 
       // Token ';' terminates the declaration.
       if (uToken != kTokenComma)
         break;
     }
     else {
-      _ast->deleteSymbol(vSym);
+      _ast->delete_symbol(vSym);
       MATHPRESSO_PARSER_ERROR(token, "Unexpected token.");
     }
 
-    isFirst = false;
+    is_first = false;
   }
 
   return kErrorOk;
 }
 
-Error Parser::parseExpression(AstNode** pNode, bool isNested) {
-  AstScope* scope = _currentScope;
+Error Parser::parse_expression(AstNode** pNode, bool isNested) {
+  AstScope* scope = _current_scope;
 
   // It's important that the given expression is parsed in a way that it can be
-  // correctly evaluated. The `parseExpression()` function can handle expressions
+  // correctly evaluated. The `parse_expression()` function can handle expressions
   // that contain unary and binary operators combined with terminals (variables,
   // constants or function calls).
   //
@@ -293,20 +293,20 @@ Error Parser::parseExpression(AstNode** pNode, bool isNested) {
   Token token;
   uint32_t op;
 
-  // Current binary operator node. Initial NULL value means that the parsing
+  // Current binary operator node. Initial nullptr value means that the parsing
   // just started and there is no binary operator yet. Once the first binary
   // operator has been parsed `oNode` will be set accordingly.
-  AstBinaryOp* oNode = NULL;
+  AstBinaryOp* oNode = nullptr;
 
   // Currently parsed node.
-  AstNode* tNode = NULL;
+  AstNode* tNode = nullptr;
 
   for (;;) {
     // Last unary node. It's an optimization to prevent recursion in case that
     // we found two or more unary expressions after each other. For example the
     // expression "-!-1" contains only unary operators that will be parsed by
-    // a single `parseExpression()` call.
-    AstUnary* unary = NULL;
+    // a single `parse_expression()` call.
+    AstUnary* unary = nullptr;
 
 _Repeat1:
     switch (_tokenizer.next(&token)) {
@@ -320,61 +320,61 @@ _Repeat1:
         StringRef str(_tokenizer._start + token.position(), token.size());
 
         AstScope* symScope;
-        AstSymbol* sym = scope->resolveSymbol(str, token.hashCode(), &symScope);
+        AstSymbol* sym = scope->resolve_symbol(str, token.hash_code(), &symScope);
 
-        if (sym == NULL)
+        if (sym == nullptr)
           MATHPRESSO_PARSER_ERROR(token, "Unresolved symbol %.*s.", static_cast<int>(str.size()), str.data());
 
-        uint32_t symType = sym->symbolType();
+        uint32_t symType = sym->symbol_type();
         AstNode* zNode;
 
         if (symType == kAstSymbolVariable) {
-          if (!sym->isDeclared())
+          if (!sym->is_declared())
             MATHPRESSO_PARSER_ERROR(token, "Can't use variable '%s' that is being declared.", sym->name());
 
           // Put symbol to shadow scope if it's global. This is done lazily and
           // only once per symbol when it's referenced.
-          if (symScope->isGlobal()) {
-            sym = _ast->shadowSymbol(sym);
+          if (symScope->is_global()) {
+            sym = _ast->shadow_symbol(sym);
             MATHPRESSO_NULLCHECK(sym);
 
-            sym->setVarSlotId(_ast->newSlotId());
-            symScope = _ast->rootScope();
-            symScope->putSymbol(sym);
+            sym->set_var_slot_id(_ast->new_slot_id());
+            symScope = _ast->root_scope();
+            symScope->put_symbol(sym);
           }
 
-          zNode = _ast->newNode<AstVar>();
+          zNode = _ast->new_node<AstVar>();
           MATHPRESSO_NULLCHECK(zNode);
-          static_cast<AstVar*>(zNode)->setSymbol(sym);
+          static_cast<AstVar*>(zNode)->set_symbol(sym);
 
-          zNode->setPosition(token.positionAsUInt());
-          sym->incUsedCount();
+          zNode->set_position(token.positionAsUInt());
+          sym->increment_used_count();
         }
         else {
-          // Will be parsed by `parseCall()` again.
+          // Will be parsed by `parse_call()` again.
           _tokenizer.set(&token);
-          MATHPRESSO_PROPAGATE(parseCall(&zNode));
+          MATHPRESSO_PROPAGATE(parse_call(&zNode));
         }
 
-        if (unary == NULL)
+        if (unary == nullptr)
           tNode = zNode;
         else
-          unary->setChild(zNode);
+          unary->set_child(zNode);
         break;
       }
 
       // Parse a number.
       case kTokenNumber: {
-        AstImm* zNode = _ast->newNode<AstImm>();
+        AstImm* zNode = _ast->new_node<AstImm>();
         MATHPRESSO_NULLCHECK(zNode);
 
-        zNode->setPosition(token.positionAsUInt());
+        zNode->set_position(token.positionAsUInt());
         zNode->_value = token.value();
 
-        if (unary == NULL)
+        if (unary == nullptr)
           tNode = zNode;
         else
-          unary->setChild(zNode);
+          unary->set_child(zNode);
         break;
       }
 
@@ -389,15 +389,15 @@ _Repeat1:
       // Parse a nested expression.
       case kTokenLParen: {
         AstNode* zNode;
-        MATHPRESSO_PROPAGATE(parseExpression(&zNode, true));
+        MATHPRESSO_PROPAGATE(parse_expression(&zNode, true));
 
         if (_tokenizer.next(&token) != kTokenRParen)
           MATHPRESSO_PARSER_ERROR(token, "Expected a ')' token.");
 
-        if (unary == NULL)
+        if (unary == nullptr)
           tNode = zNode;
         else
-          unary->setChild(zNode);
+          unary->set_child(zNode);
 
         break;
       }
@@ -408,14 +408,14 @@ _Repeat1:
       case kTokenNot         : op = kOpNot   ; goto _Unary;
 _Unary: {
         // Parse the unary operator.
-        AstUnaryOp* opNode = _ast->newNode<AstUnaryOp>(op);
+        AstUnaryOp* opNode = _ast->new_node<AstUnaryOp>(op);
         MATHPRESSO_NULLCHECK(opNode);
-        opNode->setPosition(token.positionAsUInt());
+        opNode->set_position(token.positionAsUInt());
 
-        if (unary == NULL)
+        if (unary == nullptr)
           tNode = opNode;
         else
-          unary->setChild(opNode);
+          unary->set_child(opNode);
 
         isNested = true;
         unary = opNode;
@@ -442,10 +442,10 @@ _Unary: {
       case kTokenEnd: {
         _tokenizer.set(&token);
 
-        if (oNode != NULL) {
-          oNode->setRight(tNode);
+        if (oNode != nullptr) {
+          oNode->set_right(tNode);
           // Iterate to the top-most node.
-          while (oNode->hasParent())
+          while (oNode->has_parent())
             oNode = static_cast<AstBinaryOp*>(oNode->parent());
           tNode = oNode;
         }
@@ -459,17 +459,17 @@ _Unary: {
         op = kOpAssign;
 
         // Check whether the assignment is valid.
-        if (tNode->nodeType() != kAstNodeVar)
+        if (tNode->node_type() != kAstNodeVar)
           MATHPRESSO_PARSER_ERROR(token, "Can't assign to a non-variable.");
 
         AstSymbol* sym = static_cast<AstVar*>(tNode)->symbol();
-        if (sym->hasSymbolFlag(kAstSymbolIsReadOnly))
+        if (sym->has_symbol_flag(kAstSymbolIsReadOnly))
           MATHPRESSO_PARSER_ERROR(token, "Can't assign to a read-only variable '%s'.", sym->name());
 
         if (isNested)
           MATHPRESSO_PARSER_ERROR(token, "Invalid assignment inside an expression.");
 
-        sym->incWriteCount();
+        sym->increment_write_count();
         goto _Binary;
       }
 
@@ -485,24 +485,24 @@ _Unary: {
       case kTokenDiv         : op = kOpDiv         ; goto _Binary;
       case kTokenMod         : op = kOpMod         ; goto _Binary;
 _Binary: {
-        AstBinaryOp* zNode = _ast->newNode<AstBinaryOp>(op);
+        AstBinaryOp* zNode = _ast->new_node<AstBinaryOp>(op);
         MATHPRESSO_NULLCHECK(zNode);
-        zNode->setPosition(token.positionAsUInt());
+        zNode->set_position(token.positionAsUInt());
 
-        if (oNode == NULL) {
+        if (oNode == nullptr) {
           // oNode <------+
           //              |
           // +------------+------------+ First operand - oNode becomes the newly
           // |         (zNode)         | created zNode; tNode is assigned to the
           // |        /       \        | left side of zNode and will be referred
-          // |     (tNode)  (NULL)     | as (...) by the next operation.
+          // |     (tNode)  (nullptr)     | as (...) by the next operation.
           // +-------------------------+
-          zNode->setLeft(tNode);
+          zNode->set_left(tNode);
           oNode = zNode;
           break;
         }
 
-        uint32_t oPrec = OpInfo::get(oNode->opType()).precedence;
+        uint32_t oPrec = OpInfo::get(oNode->op_type()).precedence;
         uint32_t zPrec = OpInfo::get(op).precedence;
 
         if (oPrec > zPrec) {
@@ -513,23 +513,23 @@ _Binary: {
           // |    /       \   |        | (oPrec), so the zNode will be assigned
           // | (...)       (zNode)     | to the right side of oNode and it will
           // |            /       \    | function as a stack-like structure. We
-          // |         (tNode)  (NULL) | have to advance back at some point.
+          // |         (tNode)  (nullptr) | have to advance back at some point.
           // +-------------------------+
-          oNode->setRight(zNode);
-          zNode->setLeft(tNode);
+          oNode->set_right(zNode);
+          zNode->set_left(tNode);
           oNode = zNode;
           break;
         }
         else {
-          oNode->setRight(tNode);
+          oNode->set_right(tNode);
 
           // Advance to the top-most oNode that has less or equal precedence
           // than zPrec.
-          while (oNode->hasParent()) {
+          while (oNode->has_parent()) {
             // Terminate conditions:
             //   1. oNode has higher precedence than zNode.
             //   2. oNode has equal precedence and right-to-left associativity.
-            if (OpInfo::get(oNode->opType()).rightAssociate(zPrec))
+            if (OpInfo::get(oNode->op_type()).right_associate(zPrec))
               break;
             oNode = static_cast<AstBinaryOp*>(oNode->parent());
           }
@@ -539,12 +539,12 @@ _Binary: {
           // +------------+------------+
           // |         (zNode)         | Simple case - oNode becomes the left
           // |        /       \        | node in the created zNode and zNode
-          // |     (oNode)  (NULL)     | becomes oNode for the next operator.
+          // |     (oNode)  (nullptr)     | becomes oNode for the next operator.
           // |    /       \            |
           // | (...)    (tNode)        | oNode will become a top-level node.
           // +-------------------------+
-          if (!oNode->hasParent() && !OpInfo::get(oNode->opType()).rightAssociate(zPrec)) {
-            zNode->setLeft(oNode);
+          if (!oNode->has_parent() && !OpInfo::get(oNode->op_type()).right_associate(zPrec)) {
+            zNode->set_left(oNode);
           }
           // oNode <----------+
           //                  |
@@ -553,12 +553,12 @@ _Binary: {
           // |    /       \   |        | Complex case - inject node in place
           // | (...)       (zNode)     | of oNode.right (because of higher
           // |            /       \    | precedence or RTL associativity).
-          // |        (tNode)   (NULL) |
+          // |        (tNode)   (nullptr) |
           // +-------------------------+
           else {
-            AstNode* pNode = oNode->unlinkRight();
-            oNode->setRight(zNode);
-            zNode->setLeft(pNode);
+            AstNode* pNode = oNode->unlink_right();
+            oNode->set_right(zNode);
+            zNode->set_left(pNode);
           }
 
           isNested = true;
@@ -576,7 +576,7 @@ _Binary: {
 }
 
 // Parse "function([arg1 [, arg2, ...] ])".
-Error Parser::parseCall(AstNode** pNodeOut) {
+Error Parser::parse_call(AstNode** pNodeOut) {
   Token token;
   uint32_t uToken;
 
@@ -585,23 +585,23 @@ Error Parser::parseCall(AstNode** pNodeOut) {
   uint32_t position = token.positionAsUInt();
 
   StringRef str(_tokenizer._start + token.position(), token.size());
-  AstSymbol* sym = _currentScope->resolveSymbol(str, token.hashCode());
+  AstSymbol* sym = _current_scope->resolve_symbol(str, token.hash_code());
 
-  if (sym == NULL)
+  if (sym == nullptr)
     MATHPRESSO_PARSER_ERROR(token, "Unresolved symbol %.*s.", static_cast<int>(str.size()), str.data());
 
-  if (sym->symbolType() != kAstSymbolIntrinsic && sym->symbolType() != kAstSymbolFunction)
+  if (sym->symbol_type() != kAstSymbolIntrinsic && sym->symbol_type() != kAstSymbolFunction)
     MATHPRESSO_PARSER_ERROR(token, "Expected a function name.");
 
   uToken = _tokenizer.next(&token);
   if (uToken != kTokenLParen)
     MATHPRESSO_PARSER_ERROR(token, "Expected a '(' token after a function name.");
 
-  AstCall* callNode = _ast->newNode<AstCall>();
-  MATHPRESSO_NULLCHECK(callNode);
+  AstCall* call_node = _ast->new_node<AstCall>();
+  MATHPRESSO_NULLCHECK(call_node);
 
-  callNode->setSymbol(sym);
-  callNode->setPosition(position);
+  call_node->set_symbol(sym);
+  call_node->set_position(position);
 
   uToken = _tokenizer.peek(&token);
   if (uToken != kTokenRParen) {
@@ -610,12 +610,12 @@ Error Parser::parseCall(AstNode** pNodeOut) {
       AstNode* expression;
       Error err;
 
-      if ((err = callNode->willAdd()) != kErrorOk || (err = parseExpression(&expression, true)) != kErrorOk) {
-        _ast->deleteNode(callNode);
+      if ((err = call_node->will_add()) != kErrorOk || (err = parse_expression(&expression, true)) != kErrorOk) {
+        _ast->delete_node(call_node);
         return err;
       }
 
-      callNode->appendNode(expression);
+      call_node->append_node(expression);
 
       // Parse ')' or ',' tokens.
       uToken = _tokenizer.peek(&token);
@@ -623,7 +623,7 @@ Error Parser::parseCall(AstNode** pNodeOut) {
         break;
 
       if (uToken != kTokenComma) {
-        _ast->deleteNode(callNode);
+        _ast->delete_node(call_node);
         MATHPRESSO_PARSER_ERROR(token, "Expected either ',' or ')' token.");
       }
 
@@ -634,44 +634,44 @@ Error Parser::parseCall(AstNode** pNodeOut) {
   _tokenizer.consume();
 
   // Validate the number of function arguments.
-  uint32_t n = callNode->size();
-  uint32_t reqArgs = sym->funcArgs();
+  uint32_t n = call_node->size();
+  uint32_t reqArgs = sym->func_args();
 
   if (n != reqArgs) {
-    _ast->deleteNode(callNode);
+    _ast->delete_node(call_node);
     MATHPRESSO_PARSER_ERROR(token, "Function '%s' requires %u argument(s) (%u provided).", sym->name(), reqArgs, n);
   }
 
   // Transform an intrinsic function into unary or binary operator.
-  if (sym->symbolType() == kAstSymbolIntrinsic) {
-    const OpInfo& op = OpInfo::get(sym->opType());
-    MATHPRESSO_ASSERT(n == op.opCount());
+  if (sym->symbol_type() == kAstSymbolIntrinsic) {
+    const OpInfo& op = OpInfo::get(sym->op_type());
+    MATHPRESSO_ASSERT(n == op.op_count());
 
     AstNode* opNode;
     if (reqArgs == 1) {
-      AstUnaryOp* unary = _ast->newNode<AstUnaryOp>(op.type);
+      AstUnaryOp* unary = _ast->new_node<AstUnaryOp>(op.type);
       MATHPRESSO_NULLCHECK(unary);
 
-      unary->setChild(callNode->removeAt(0));
+      unary->set_child(call_node->remove_at(0));
       opNode = unary;
     }
     else {
-      AstBinaryOp* binary = _ast->newNode<AstBinaryOp>(op.type);
+      AstBinaryOp* binary = _ast->new_node<AstBinaryOp>(op.type);
       MATHPRESSO_NULLCHECK(binary);
 
-      binary->setRight(callNode->removeAt(1));
-      binary->setLeft(callNode->removeAt(0));
+      binary->set_right(call_node->remove_at(1));
+      binary->set_left(call_node->remove_at(0));
       opNode = binary;
     }
 
-    opNode->setPosition(callNode->position());
-    _ast->deleteNode(callNode);
+    opNode->set_position(call_node->position());
+    _ast->delete_node(call_node);
 
     *pNodeOut = opNode;
     return kErrorOk;
   }
   else {
-    *pNodeOut = callNode;
+    *pNodeOut = call_node;
     return kErrorOk;
   }
 }

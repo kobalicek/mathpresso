@@ -13,8 +13,8 @@
 
 namespace mathpresso {
 
-MATHPRESSO_NOAPI CompiledFunc mpCompileFunction(AstBuilder* ast, uint32_t options, OutputLog* log);
-MATHPRESSO_NOAPI void mpFreeFunction(void* fn);
+MATHPRESSO_NOAPI CompiledFunc compile_function(AstBuilder* ast, uint32_t options, OutputLog* log);
+MATHPRESSO_NOAPI void free_compiled_function(void* fn);
 
 } // {mathpresso}
 

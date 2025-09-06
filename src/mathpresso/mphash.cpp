@@ -12,35 +12,35 @@
 
 namespace mathpresso {
 
-static const uint32_t mpPrimeTable[] = {
+static const uint32_t prime_table[] = {
   19, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593
 };
 
 // MathPresso - HashUtils
 // ======================
 
-uint32_t HashUtils::hashString(const char* data, size_t size) {
+uint32_t HashUtils::hash_string(const char* data, size_t size) {
   if (size == 0)
     return 0;
 
-  uint32_t hashCode = uint8_t(*data++);
+  uint32_t hash_code = uint8_t(*data++);
   if (--size == 0)
-    return hashCode;
+    return hash_code;
 
   do {
-    hashCode = HashUtils::hashChar(hashCode, uint8_t(*data++));
+    hash_code = HashUtils::hash_char(hash_code, uint8_t(*data++));
   } while (--size);
 
-  return hashCode;
+  return hash_code;
 }
 
-uint32_t HashUtils::closestPrime(uint32_t x) {
+uint32_t HashUtils::closest_prime(uint32_t x) {
   uint32_t p, i = 0;
 
   do {
-    if ((p = mpPrimeTable[i]) > x)
+    if ((p = prime_table[i]) > x)
       break;
-  } while (++i < MATHPRESSO_ARRAY_SIZE(mpPrimeTable));
+  } while (++i < MATHPRESSO_ARRAY_SIZE(prime_table));
 
   return p;
 }
@@ -48,28 +48,27 @@ uint32_t HashUtils::closestPrime(uint32_t x) {
 // MathPresso - HashBase
 // =====================
 
-void HashBase::_rehash(uint32_t newCount) {
-  ZoneAllocator* allocator = _allocator;
+void HashBase::_rehash(uint32_t new_count) {
+  Arena& arena = _arena;
 
-  HashNode** oldData = _data;
-  HashNode** newData = static_cast<HashNode**>(
-    allocator->allocZeroed(
-      static_cast<size_t>(newCount + kExtraCount) * sizeof(void*)));
+  HashNode** old_data = _data;
+  HashNode** new_data = static_cast<HashNode**>(arena.alloc_reusable_zeroed(static_cast<size_t>(new_count + kExtraCount) * sizeof(void*)));
 
-  if (newData == NULL)
+  if (new_data == nullptr) {
     return;
+  }
 
   uint32_t i;
-  uint32_t oldCount = _bucketsCount;
+  uint32_t old_count = _buckets_count;
 
-  for (i = 0; i < oldCount; i++) {
-    HashNode* node = oldData[i];
-    while (node != NULL) {
+  for (i = 0; i < old_count; i++) {
+    HashNode* node = old_data[i];
+    while (node != nullptr) {
       HashNode* next = node->_next;
-      uint32_t hMod = node->_hashCode % newCount;
+      uint32_t hash_mod = node->_hash_code % new_count;
 
-      node->_next = newData[hMod];
-      newData[hMod] = node;
+      node->_next = new_data[hash_mod];
+      new_data[hash_mod] = node;
 
       node = next;
     }
@@ -77,22 +76,22 @@ void HashBase::_rehash(uint32_t newCount) {
 
   // Move extra entries.
   for (i = 0; i < kExtraCount; i++) {
-    newData[i + newCount] = oldData[i + oldCount];
+    new_data[i + new_count] = old_data[i + old_count];
   }
 
   // 90% is the maximum occupancy, can't overflow since the maximum capacity
-  // is limited to the last prime number stored in the `mpPrimeTable[]` array.
-  _bucketsCount = newCount;
-  _bucketsGrow = newCount * 9 / 10;
+  // is limited to the last prime number stored in the `prime_table[]` array.
+  _buckets_count = new_count;
+  _buckets_grow = new_count * 9 / 10;
 
-  _data = newData;
-  if (oldData != _embedded)
-    allocator->release(oldData,
-      static_cast<size_t>(oldCount + kExtraCount) * sizeof(void*));
+  _data = new_data;
+  if (old_data != _embedded) {
+    arena.free_reusable(old_data, static_cast<size_t>(old_count + kExtraCount) * sizeof(void*));
+  }
 }
 
-void HashBase::_mergeToInvisibleSlot(HashBase& other) {
-  uint32_t i, count = other._bucketsCount + kExtraCount;
+void HashBase::_merge_to_invisible_slot(HashBase& other) {
+  uint32_t i, count = other._buckets_count + kExtraCount;
   HashNode** data = other._data;
 
   HashNode* first;
@@ -101,33 +100,33 @@ void HashBase::_mergeToInvisibleSlot(HashBase& other) {
   // Find the `first` node.
   for (i = 0; i < count; i++) {
     first = data[i];
-    if (first != NULL)
+    if (first != nullptr)
       break;
   }
 
-  if (first != NULL) {
+  if (first != nullptr) {
     // Initialize `first` and `last`.
     last = first;
-    while (last->_next != NULL)
+    while (last->_next != nullptr)
       last = last->_next;
-    data[i] = NULL;
+    data[i] = nullptr;
 
     // Iterate over the rest and append so `first` stay the same and `last`
     // is updated to the last node added.
     while (++i < count) {
       HashNode* node = data[i];
-      if (node != NULL) {
+      if (node != nullptr) {
         last->_next = node;
         last = node;
-        while (last->_next != NULL)
+        while (last->_next != nullptr)
           last = last->_next;
-        data[i] = NULL;
+        data[i] = nullptr;
       }
     }
 
     // Link with ours.
-    if (last != NULL) {
-      i = _bucketsCount + kExtraFirst;
+    if (last != nullptr) {
+      i = _buckets_count + kExtraFirst;
       last->_next = _data[i];
       _data[i] = first;
     }
@@ -135,38 +134,38 @@ void HashBase::_mergeToInvisibleSlot(HashBase& other) {
 }
 
 HashNode* HashBase::_put(HashNode* node) {
-  uint32_t hMod = node->_hashCode % _bucketsCount;
-  HashNode* next = _data[hMod];
+  uint32_t hash_mod = node->_hash_code % _buckets_count;
+  HashNode* next = _data[hash_mod];
 
   node->_next = next;
-  _data[hMod] = node;
+  _data[hash_mod] = node;
 
-  if (++_size >= _bucketsGrow && next != NULL) {
-    uint32_t newCapacity = HashUtils::closestPrime(_bucketsCount + kExtraCount);
-    if (newCapacity != _bucketsCount)
-      _rehash(newCapacity);
+  if (++_size >= _buckets_grow && next != nullptr) {
+    uint32_t new_capacity = HashUtils::closest_prime(_buckets_count + kExtraCount);
+    if (new_capacity != _buckets_count)
+      _rehash(new_capacity);
   }
 
   return node;
 }
 
 HashNode* HashBase::_del(HashNode* node) {
-  uint32_t hMod = node->_hashCode % _bucketsCount;
+  uint32_t hash_mod = node->_hash_code % _buckets_count;
 
-  HashNode** pPrev = &_data[hMod];
-  HashNode* p = *pPrev;
+  HashNode** prev = &_data[hash_mod];
+  HashNode* p = *prev;
 
-  while (p != NULL) {
+  while (p != nullptr) {
     if (p == node) {
-      *pPrev = p->_next;
+      *prev = p->_next;
       return node;
     }
 
-    pPrev = &p->_next;
-    p = *pPrev;
+    prev = &p->_next;
+    p = *prev;
   }
 
-  return NULL;
+  return nullptr;
 }
 
 } // {mathpresso}

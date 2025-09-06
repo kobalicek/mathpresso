@@ -128,12 +128,6 @@ enum {
   kPow10TableSize = static_cast<int>(MATHPRESSO_ARRAY_SIZE(mpPow10Table))
 };
 
-#define CHAR4X(C0, C1, C2, C3) \
-  ( (static_cast<uint32_t>(C0)      ) + \
-    (static_cast<uint32_t>(C1) <<  8) + \
-    (static_cast<uint32_t>(C2) << 16) + \
-    (static_cast<uint32_t>(C3) << 24) )
-
 //! \internal
 //!
 //! Converts a given symbol `s` of `size` to a keyword token.
@@ -154,7 +148,7 @@ uint32_t Tokenizer::peek(Token* token) {
 uint32_t Tokenizer::next(Token* token) {
   // Skip parsing if the next token is already done, caused by `peek()`.
   uint32_t c = _token._tokenType;
-  uint32_t hashCode;
+  uint32_t hash_code;
 
   if (c != kTokenInvalid) {
     *token = _token;
@@ -166,7 +160,7 @@ uint32_t Tokenizer::next(Token* token) {
   const uint8_t* p = reinterpret_cast<const uint8_t*>(_p);
   const uint8_t* pToken = p;
 
-  const uint8_t* pStart = reinterpret_cast<const uint8_t*>(_start);
+  const uint8_t* ptr_start = reinterpret_cast<const uint8_t*>(_start);
   const uint8_t* pEnd = reinterpret_cast<const uint8_t*>(_end);
 
   // Spaces
@@ -177,8 +171,8 @@ _Repeat:
     if (p == pEnd)
       goto _EndOfInput;
 
-    hashCode = p[0];
-    c = mpCharClass[hashCode];
+    hash_code = p[0];
+    c = mpCharClass[hash_code];
 
     if (c != kTokenCharSpc)
       break;
@@ -244,7 +238,7 @@ _Repeat:
       // Token is '.'.
       if ((size_t)(p - pToken) == 1) {
         _p = reinterpret_cast<const char*>(p);
-        return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenDot);
+        return token->set_data((size_t)(pToken - ptr_start), (size_t)(p - pToken), 0, kTokenDot);
       }
     }
 
@@ -306,20 +300,20 @@ _Repeat:
       char tmp[512];
       char* buf = tmp;
 
-      if (size >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(size + 1))) == NULL)
+      if (size >= MATHPRESSO_ARRAY_SIZE(tmp) && (buf = static_cast<char*>(::malloc(size + 1))) == nullptr)
         return kTokenInvalid;
 
       memcpy(buf, pToken, size);
       buf[size] = '\0';
 
-      val = _strtod.conv(buf, NULL);
+      val = _strtod.conv(buf, nullptr);
 
       if (buf != tmp)
         ::free(buf);
     }
 
     token->_value = val;
-    token->setData((size_t)(pToken - pStart), size, 0, kTokenNumber);
+    token->set_data((size_t)(pToken - ptr_start), size, 0, kTokenNumber);
 
     _p = reinterpret_cast<const char*>(p);
     return kTokenNumber;
@@ -329,18 +323,18 @@ _Repeat:
   // ----------------
 
   else if (c <= kTokenCharSym) {
-    // We always calculate hashCode during tokenization to improve performance.
+    // We always calculate hash_code during tokenization to improve performance.
     while (++p != pEnd) {
       uint32_t ord = p[0];
       c = mpCharClass[ord];
       if (c > kTokenCharSym)
         break;
-      hashCode = HashUtils::hashChar(hashCode, ord);
+      hash_code = HashUtils::hash_char(hash_code, ord);
     }
 
     size_t size = (size_t)(p - pToken);
     _p = reinterpret_cast<const char*>(p);
-    return token->setData((size_t)(pToken - pStart), size, hashCode, mpGetKeyword(pToken, size));
+    return token->set_data((size_t)(pToken - ptr_start), size, hash_code, mpGetKeyword(pToken, size));
   }
 
   // Single-Char
@@ -348,7 +342,7 @@ _Repeat:
 
   else if (c <= kTokenCharSingleCharTokenEnd) {
     _p = reinterpret_cast<const char*>(++p);
-    return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, c);
+    return token->set_data((size_t)(pToken - ptr_start), (size_t)(p - pToken), 0, c);
   }
 
   // Single-Char | Multi-Char
@@ -446,7 +440,7 @@ _Repeat:
     }
 
     _p = reinterpret_cast<const char*>(p);
-    return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, c);
+    return token->set_data((size_t)(pToken - ptr_start), (size_t)(p - pToken), 0, c);
   }
 
   // Invalid
@@ -454,7 +448,7 @@ _Repeat:
 
 _Invalid:
   _p = reinterpret_cast<const char*>(pToken);
-  return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenInvalid);
+  return token->set_data((size_t)(pToken - ptr_start), (size_t)(p - pToken), 0, kTokenInvalid);
 
   // Comment
   // -------
@@ -474,7 +468,7 @@ _Comment:
 
 _EndOfInput:
   _p = _end;
-  return token->setData((size_t)(pToken - pStart), (size_t)(p - pToken), 0, kTokenEnd);
+  return token->set_data((size_t)(pToken - ptr_start), (size_t)(p - pToken), 0, kTokenEnd);
 }
 
 } // {mathpresso}

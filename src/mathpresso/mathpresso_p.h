@@ -84,12 +84,12 @@
 //! \internal
 #define MATHPRESSO_ASSERT(exp) do { \
   if (!(exp)) \
-    ::mathpresso::mpAssertionFailure(__FILE__, __LINE__, #exp); \
+    ::mathpresso::assertion_failure(__FILE__, __LINE__, #exp); \
   } while (0)
 
 //! \internal
 #define MATHPRESSO_ASSERT_NOT_REACHED() do { \
-    ::mathpresso::mpAssertionFailure(__FILE__, __LINE__, "Not reached"); \
+    ::mathpresso::assertion_failure(__FILE__, __LINE__, "Not reached"); \
   } while (0)
 
 //! \internal
@@ -127,7 +127,7 @@
   } while (0)
 
 #define MATHPRESSO_TRACE_ERROR(error) \
-  ::mathpresso::mpTraceError(error)
+  ::mathpresso::make_error(error)
 
 namespace mathpresso {
 
@@ -135,9 +135,8 @@ namespace mathpresso {
 using asmjit::String;
 using asmjit::StringTmp;
 
-using asmjit::Zone;
-using asmjit::ZoneVector;
-using asmjit::ZoneAllocator;
+using asmjit::Arena;
+using asmjit::ArenaVector;
 
 // MathPresso OpType
 // =================
@@ -268,12 +267,12 @@ enum InternalOptions {
 //! \internal
 //!
 //! MathPresso assertion handler.
-MATHPRESSO_NOAPI void mpAssertionFailure(const char* file, int line, const char* msg);
+MATHPRESSO_NOAPI void assertion_failure(const char* file, int line, const char* msg);
 
 // MathPresso - Tracing
 // ====================
 
-MATHPRESSO_NOAPI Error mpTraceError(Error error);
+MATHPRESSO_NOAPI Error make_error(Error error);
 
 // MathPresso - OpInfo
 // ===================
@@ -284,7 +283,7 @@ struct OpInfo {
   // -------
 
   uint8_t type;
-  uint8_t altType;
+  uint8_t alt_type;
   uint8_t precedence;
   uint8_t reserved;
   uint32_t flags;
@@ -293,36 +292,37 @@ struct OpInfo {
   // Statics
   // -------
 
-  static MATHPRESSO_INLINE const OpInfo& get(uint32_t opType);
+  static MATHPRESSO_INLINE const OpInfo& get(uint32_t op_type);
 
   // Accessors
   // ---------
 
-  MATHPRESSO_INLINE bool isUnary() const { return (flags & kOpFlagUnary) != 0; }
-  MATHPRESSO_INLINE bool isBinary() const { return (flags & kOpFlagBinary) != 0; }
-  MATHPRESSO_INLINE uint32_t opCount() const { return 1 + ((flags & kOpFlagBinary) != 0); }
+  MATHPRESSO_INLINE bool is_unary() const { return (flags & kOpFlagUnary) != 0; }
+  MATHPRESSO_INLINE bool is_binary() const { return (flags & kOpFlagBinary) != 0; }
+  MATHPRESSO_INLINE uint32_t op_count() const { return 1 + ((flags & kOpFlagBinary) != 0); }
 
-  MATHPRESSO_INLINE bool isIntrinsic() const { return (flags & kOpFlagIntrinsic) != 0; }
+  MATHPRESSO_INLINE bool is_intrinsic() const { return (flags & kOpFlagIntrinsic) != 0; }
 
-  MATHPRESSO_INLINE bool isLeftToRight() const { return (flags & kOpFlagRightToLeft) == 0; }
-  MATHPRESSO_INLINE bool isRightToLeft() const { return (flags & kOpFlagRightToLeft) != 0; }
+  MATHPRESSO_INLINE bool is_left_to_right() const { return (flags & kOpFlagRightToLeft) == 0; }
+  MATHPRESSO_INLINE bool is_right_to_left() const { return (flags & kOpFlagRightToLeft) != 0; }
 
-  MATHPRESSO_INLINE bool isAssignment() const { return (flags & kOpFlagAssign) != 0; }
-  MATHPRESSO_INLINE bool isArithmetic() const { return (flags & kOpFlagArithmetic) != 0; }
-  MATHPRESSO_INLINE bool isCondition() const { return (flags & kOpFlagCondition) != 0; }
+  MATHPRESSO_INLINE bool is_assignment() const { return (flags & kOpFlagAssign) != 0; }
+  MATHPRESSO_INLINE bool is_arithmetic() const { return (flags & kOpFlagArithmetic) != 0; }
+  MATHPRESSO_INLINE bool is_condition() const { return (flags & kOpFlagCondition) != 0; }
 
-  MATHPRESSO_INLINE bool isRounding() const { return (flags & kOpFlagRounding) != 0; }
-  MATHPRESSO_INLINE bool isTrigonometric() const { return (flags & kOpFlagTrigonometric) != 0; }
+  MATHPRESSO_INLINE bool is_rounding() const { return (flags & kOpFlagRounding) != 0; }
+  MATHPRESSO_INLINE bool is_trigonometric() const { return (flags & kOpFlagTrigonometric) != 0; }
 
-  MATHPRESSO_INLINE bool rightAssociate(uint32_t rPrec) const {
-    return precedence > rPrec || (precedence == rPrec && isRightToLeft());
+  MATHPRESSO_INLINE bool right_associate(uint32_t right_precedence) const {
+    return precedence > right_precedence ||
+           (precedence == right_precedence && is_right_to_left());
   }
 };
-extern const OpInfo mpOpInfo[kOpCount];
+extern const OpInfo op_info_table[kOpCount];
 
 MATHPRESSO_INLINE const OpInfo& OpInfo::get(uint32_t op) {
   MATHPRESSO_ASSERT(op < kOpCount);
-  return mpOpInfo[op];
+  return op_info_table[op];
 }
 
 // MathPresso - StringRef
@@ -344,7 +344,7 @@ struct StringRef {
   // --------------------------
 
   MATHPRESSO_INLINE StringRef()
-    : _data(NULL),
+    : _data(nullptr),
       _size(0) {}
 
   explicit MATHPRESSO_INLINE StringRef(const char* data)
@@ -359,7 +359,7 @@ struct StringRef {
   // -------------
 
   MATHPRESSO_INLINE void reset() {
-    set(NULL, 0);
+    set(nullptr, 0);
   }
 
   MATHPRESSO_INLINE void set(const char* data) {
@@ -384,9 +384,9 @@ struct StringRef {
 
   MATHPRESSO_INLINE bool eq(const char* s) const {
     const char* a = _data;
-    const char* aEnd = a + _size;
+    const char* a_end = a + _size;
 
-    while (a != aEnd) {
+    while (a != a_end) {
       if (*a++ != *s++)
         return false;
     }
@@ -423,23 +423,23 @@ struct ErrorReporter {
       _log(log) {
 
     // These should be handled by MATHPRESSO before the `ErrorReporter` is created.
-    MATHPRESSO_ASSERT((log == NULL && (_options & kInternalOptionLog) == 0) ||
-                      (log != NULL && (_options & kInternalOptionLog) != 0) );
+    MATHPRESSO_ASSERT((log == nullptr && (_options & kInternalOptionLog) == 0) ||
+                      (log != nullptr && (_options & kInternalOptionLog) != 0) );
   }
 
   // Interface
   // ---------
 
-  MATHPRESSO_INLINE bool reportsErrors() const { return (_options & kInternalOptionLog) != 0; }
-  MATHPRESSO_INLINE bool reportsWarnings() const { return (_options & kOptionVerbose) != 0; }
+  MATHPRESSO_INLINE bool does_report_errors() const { return (_options & kInternalOptionLog) != 0; }
+  MATHPRESSO_INLINE bool does_report_warnings() const { return (_options & kOptionVerbose) != 0; }
 
-  void getLineAndColumn(uint32_t position, uint32_t& line, uint32_t& column);
+  void get_line_and_column(uint32_t position, uint32_t& line, uint32_t& column);
 
-  void onWarning(uint32_t position, const char* fmt, ...);
-  void onWarning(uint32_t position, const String& msg);
+  void on_warning(uint32_t position, const char* fmt, ...);
+  void on_warning(uint32_t position, const String& msg);
 
-  Error onError(Error error, uint32_t position, const char* fmt, ...);
-  Error onError(Error error, uint32_t position, const String& msg);
+  Error on_error(Error error, uint32_t position, const char* fmt, ...);
+  Error on_error(Error error, uint32_t position, const String& msg);
 };
 
 } // {mathpresso}

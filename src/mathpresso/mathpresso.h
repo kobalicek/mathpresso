@@ -222,8 +222,9 @@ enum FunctionFlags {
 
 struct ContextImpl {
   //! Reference count (atomic).
-  uintptr_t _refCount;
+  uintptr_t _ref_count;
 };
+
 //! MathPresso context.
 //!
 //! Context is an environment where you can add/remove constants, variables and
@@ -260,17 +261,17 @@ struct Context {
   // ---------
 
   //! Add built-in intrinsics and constants.
-  MATHPRESSO_API Error addBuiltIns(void);
+  MATHPRESSO_API Error add_builtins(void);
 
   //! Add constant to this context.
-  MATHPRESSO_API Error addConstant(const char* name, double value);
+  MATHPRESSO_API Error add_constant(const char* name, double value);
   //! Add variable to this context.
-  MATHPRESSO_API Error addVariable(const char* name, int offset, unsigned int flags = kVariableRW);
+  MATHPRESSO_API Error add_variable(const char* name, int offset, unsigned int flags = kVariableRW);
   //! Add function to this context.
-  MATHPRESSO_API Error addFunction(const char* name, void* fn, unsigned int flags);
+  MATHPRESSO_API Error add_function(const char* name, void* fn, unsigned int flags);
 
   //! Delete symbol from this context.
-  MATHPRESSO_API Error delSymbol(const char* name);
+  MATHPRESSO_API Error del_symbol(const char* name);
 };
 
 // MathPresso Expresion
@@ -306,10 +307,10 @@ struct Expression {
   //!        generate
   //!
   //! Returns MathPresso's error code, see \ref Error.
-  MATHPRESSO_API Error compile(const Context& ctx, const char* body, unsigned int options, OutputLog* log = NULL);
+  MATHPRESSO_API Error compile(const Context& ctx, const char* body, unsigned int options, OutputLog* log = nullptr);
 
   //! Get whether the `Expression` contains a valid compiled expression.
-  MATHPRESSO_API bool isCompiled() const;
+  MATHPRESSO_API bool is_compiled() const;
 
   //! Reset the expression.
   MATHPRESSO_API void reset();

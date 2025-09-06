@@ -19,19 +19,19 @@ struct AstNodeSize {
   // Members
   // -------
 
-  uint8_t _nodeType;
+  uint8_t _node_type;
   uint8_t _reserved;
-  uint16_t _nodeSize;
+  uint16_t _node_size;
 
   // Accessors
   // ---------
 
-  MATHPRESSO_INLINE uint32_t nodeType() const { return _nodeType; }
-  MATHPRESSO_INLINE uint32_t nodeSize() const { return _nodeSize; }
+  MATHPRESSO_INLINE uint32_t node_type() const { return _node_type; }
+  MATHPRESSO_INLINE uint32_t node_size() const { return _node_size; }
 };
 
 #define ROW(type, size) { type, 0, static_cast<uint8_t>(size) }
-static const AstNodeSize mpAstNodeSize[] = {
+static const AstNodeSize ast_node_size_table[] = {
   ROW(kAstNodeNone     , 0                   ),
   ROW(kAstNodeProgram  , sizeof(AstProgram)  ),
   ROW(kAstNodeBlock    , sizeof(AstBlock)    ),
@@ -47,60 +47,61 @@ static const AstNodeSize mpAstNodeSize[] = {
 // MathPresso - AstBuilder
 // =======================
 
-AstBuilder::AstBuilder(ZoneAllocator* allocator)
-  : _allocator(allocator),
-    _rootScope(NULL),
-    _programNode(NULL),
-    _numSlots(0) {}
+AstBuilder::AstBuilder(Arena& arena)
+  : _arena(arena),
+    _root_scope(nullptr),
+    _program_node(nullptr),
+    _num_slots(0) {}
 AstBuilder::~AstBuilder() {}
 
-AstScope* AstBuilder::newScope(AstScope* parent, uint32_t scopeType) {
-  void* p = _allocator->alloc(sizeof(AstScope));
-  if (p == NULL)
-    return NULL;
-  return new(p) AstScope(this, parent, scopeType);
+AstScope* AstBuilder::new_scope(AstScope* parent, uint32_t scope_type) {
+  void* p = _arena.alloc_reusable(sizeof(AstScope));
+  if (p == nullptr) {
+    return nullptr;
+  }
+  return new(p) AstScope(this, parent, scope_type);
 }
 
-void AstBuilder::deleteScope(AstScope* scope) {
+void AstBuilder::delete_scope(AstScope* scope) {
   scope->~AstScope();
-  _allocator->release(scope, sizeof(AstScope));
+  _arena.free_reusable(scope, sizeof(AstScope));
 }
 
-AstSymbol* AstBuilder::newSymbol(const StringRef& key, uint32_t hashCode, uint32_t symbolType, uint32_t scopeType) {
+AstSymbol* AstBuilder::new_symbol(const StringRef& key, uint32_t hash_code, uint32_t symbol_type, uint32_t scope_type) {
   size_t keySize = key.size();
-  void* p = _allocator->alloc(sizeof(AstSymbol) + keySize + 1);
+  void* p = _arena.alloc_reusable(sizeof(AstSymbol) + keySize + 1);
 
-  if (p == NULL)
-    return NULL;
+  if (p == nullptr)
+    return nullptr;
 
   char* keyData = static_cast<char*>(p) + sizeof(AstSymbol);
   ::memcpy(keyData, key.data(), keySize);
 
   keyData[keySize] = '\0';
-  return new(p) AstSymbol(keyData, static_cast<uint32_t>(keySize), hashCode, symbolType, scopeType);
+  return new(p) AstSymbol(keyData, static_cast<uint32_t>(keySize), hash_code, symbol_type, scope_type);
 }
 
-AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
-  StringRef name(other->name(), other->nameSize());
-  AstSymbol* sym = newSymbol(name, other->hashCode(), other->symbolType(), kAstScopeShadow);
+AstSymbol* AstBuilder::shadow_symbol(const AstSymbol* other) {
+  StringRef name(other->name(), other->name_size());
+  AstSymbol* sym = new_symbol(name, other->hash_code(), other->symbol_type(), kAstScopeShadow);
 
-  if (sym == NULL)
-    return NULL;
+  if (sym == nullptr)
+    return nullptr;
 
-  sym->_opType = other->_opType;
-  sym->_symbolFlags = other->_symbolFlags;
+  sym->_op_type = other->_op_type;
+  sym->_symbol_flags = other->_symbol_flags;
 
-  switch (sym->symbolType()) {
+  switch (sym->symbol_type()) {
     case kAstSymbolVariable: {
-      sym->_varSlotId = other->_varSlotId;
-      sym->_varOffset = other->_varOffset;
+      sym->_var_slot_id = other->_var_slot_id;
+      sym->_var_offset = other->_var_offset;
       sym->_value = other->_value;
       break;
     }
 
     case kAstSymbolFunction: {
-      sym->_funcPtr = other->_funcPtr;
-      sym->_funcArgs = other->_funcArgs;
+      sym->_func_ptr = other->_func_ptr;
+      sym->_func_args = other->_func_args;
       break;
     }
   }
@@ -108,20 +109,20 @@ AstSymbol* AstBuilder::shadowSymbol(const AstSymbol* other) {
   return sym;
 }
 
-void AstBuilder::deleteSymbol(AstSymbol* symbol) {
-  size_t keySize = symbol->nameSize();
+void AstBuilder::delete_symbol(AstSymbol* symbol) {
+  size_t keySize = symbol->name_size();
   symbol->~AstSymbol();
-  _allocator->release(symbol, sizeof(AstSymbol) + keySize + 1);
+  _arena.free_reusable(symbol, sizeof(AstSymbol) + keySize + 1);
 }
 
-void AstBuilder::deleteNode(AstNode* node) {
+void AstBuilder::delete_node(AstNode* node) {
   uint32_t size = node->size();
   AstNode** children = node->children();
 
-  uint32_t nodeType = node->nodeType();
-  MATHPRESSO_ASSERT(mpAstNodeSize[nodeType].nodeType() == nodeType);
+  uint32_t node_type = node->node_type();
+  MATHPRESSO_ASSERT(ast_node_size_table[node_type].node_type() == node_type);
 
-  switch (nodeType) {
+  switch (node_type) {
     case kAstNodeProgram  : static_cast<AstProgram*  >(node)->destroy(this); break;
     case kAstNodeBlock    : static_cast<AstBlock*    >(node)->destroy(this); break;
     case kAstNodeVarDecl  : static_cast<AstVarDecl*  >(node)->destroy(this); break;
@@ -134,29 +135,29 @@ void AstBuilder::deleteNode(AstNode* node) {
 
   for (uint32_t i = 0; i < size; i++) {
     AstNode* child = children[i];
-    if (child != NULL)
-      deleteNode(child);
+    if (child != nullptr)
+      delete_node(child);
   }
 
-  _allocator->release(node, mpAstNodeSize[nodeType].nodeSize());
+  _arena.free_reusable(node, ast_node_size_table[node_type].node_size());
 }
 
-Error AstBuilder::initProgramScope() {
-  if (_rootScope == NULL) {
-    _rootScope = newScope(NULL, kAstScopeGlobal);
-    MATHPRESSO_NULLCHECK(_rootScope);
+Error AstBuilder::init_program_scope() {
+  if (_root_scope == nullptr) {
+    _root_scope = new_scope(nullptr, kAstScopeGlobal);
+    MATHPRESSO_NULLCHECK(_root_scope);
   }
 
-  if (_programNode == NULL) {
-    _programNode = newNode<AstProgram>();
-    MATHPRESSO_NULLCHECK(_programNode);
+  if (_program_node == nullptr) {
+    _program_node = new_node<AstProgram>();
+    MATHPRESSO_NULLCHECK(_program_node);
   }
 
   return kErrorOk;
 }
 
 Error AstBuilder::dump(String& sb) {
-  return AstDump(this, sb).onProgram(programNode());
+  return AstDump(this, sb).on_program(program_node());
 }
 
 // MathPresso - AstScope
@@ -164,32 +165,32 @@ Error AstBuilder::dump(String& sb) {
 
 struct AstScopeReleaseHandler {
   MATHPRESSO_INLINE AstScopeReleaseHandler(AstBuilder* ast) : _ast(ast) {}
-  MATHPRESSO_INLINE void release(AstSymbol* node) { _ast->deleteSymbol(node); }
+  MATHPRESSO_INLINE void release(AstSymbol* node) { _ast->delete_symbol(node); }
 
   AstBuilder* _ast;
 };
 
-AstScope::AstScope(AstBuilder* ast, AstScope* parent, uint32_t scopeType)
+AstScope::AstScope(AstBuilder* ast, AstScope* parent, uint32_t scope_type)
   : _ast(ast),
     _parent(parent),
-    _symbols(ast->allocator()),
-    _scopeType(static_cast<uint8_t>(scopeType)) {}
+    _symbols(ast->arena()),
+    _scope_type(static_cast<uint8_t>(scope_type)) {}
 
 AstScope::~AstScope() {
   AstScopeReleaseHandler handler(_ast);
   _symbols.reset(handler);
 }
 
-AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hashCode, AstScope** scopeOut) {
+AstSymbol* AstScope::resolve_symbol(const StringRef& name, uint32_t hash_code, AstScope** scope_out) {
   AstScope* scope = this;
   AstSymbol* symbol;
 
   do {
-    symbol = scope->_symbols.get(name, hashCode);
-  } while (symbol == NULL && (scope = scope->parent()) != NULL);
+    symbol = scope->_symbols.get(name, hash_code);
+  } while (symbol == nullptr && (scope = scope->parent()) != nullptr);
 
-  if (scopeOut != NULL)
-    *scopeOut = scope;
+  if (scope_out != nullptr)
+    *scope_out = scope;
 
   return symbol;
 }
@@ -197,10 +198,10 @@ AstSymbol* AstScope::resolveSymbol(const StringRef& name, uint32_t hashCode, Ast
 // MathPresso - AstNode
 // ====================
 
-AstNode* AstNode::replaceNode(AstNode* refNode, AstNode* node) {
-  MATHPRESSO_ASSERT(refNode != NULL);
-  MATHPRESSO_ASSERT(refNode->parent() == this);
-  MATHPRESSO_ASSERT(node == NULL || !node->hasParent());
+AstNode* AstNode::replace_node(AstNode* ref_node, AstNode* node) {
+  MATHPRESSO_ASSERT(ref_node != nullptr);
+  MATHPRESSO_ASSERT(ref_node->parent() == this);
+  MATHPRESSO_ASSERT(node == nullptr || !node->has_parent());
 
   uint32_t size = _size;
   AstNode** children = _children;
@@ -208,37 +209,37 @@ AstNode* AstNode::replaceNode(AstNode* refNode, AstNode* node) {
   for (uint32_t i = 0; i < size; i++) {
     AstNode* child = children[i];
 
-    if (child != refNode)
+    if (child != ref_node)
       continue;
 
     children[i] = node;
-    refNode->_parent = NULL;
+    ref_node->_parent = nullptr;
 
-    if (node != NULL)
+    if (node != nullptr)
       node->_parent = this;
 
-    return refNode;
+    return ref_node;
   }
 
-  return NULL;
+  return nullptr;
 }
 
-AstNode* AstNode::replaceAt(uint32_t index, AstNode* node) {
-  AstNode* child = childAt(index);
+AstNode* AstNode::replace_at(uint32_t index, AstNode* node) {
+  AstNode* child = child_at(index);
   _children[index] = node;
 
-  if (child != NULL)
-    child->_parent = NULL;
+  if (child != nullptr)
+    child->_parent = nullptr;
 
-  if (node != NULL)
+  if (node != nullptr)
     node->_parent = this;
 
   return child;
 }
 
-AstNode* AstNode::injectNode(AstNode* refNode, AstUnary* node) {
-  MATHPRESSO_ASSERT(refNode != NULL && refNode->parent() == this);
-  MATHPRESSO_ASSERT(node != NULL && node->parent() == NULL);
+AstNode* AstNode::inject_node(AstNode* ref_node, AstUnary* node) {
+  MATHPRESSO_ASSERT(ref_node != nullptr && ref_node->parent() == this);
+  MATHPRESSO_ASSERT(node != nullptr && node->parent() == nullptr);
 
   uint32_t size = _size;
   AstNode** children = _children;
@@ -246,26 +247,26 @@ AstNode* AstNode::injectNode(AstNode* refNode, AstUnary* node) {
   for (uint32_t i = 0; i < size; i++) {
     AstNode* child = children[i];
 
-    if (child != refNode)
+    if (child != ref_node)
       continue;
 
     children[i] = node;
-    refNode->_parent = node;
+    ref_node->_parent = node;
 
     node->_parent = this;
-    node->_child = refNode;
+    node->_child = ref_node;
 
-    return refNode;
+    return ref_node;
   }
 
-  return NULL;
+  return nullptr;
 }
 
-AstNode* AstNode::injectAt(uint32_t index, AstUnary* node) {
-  AstNode* child = childAt(index);
+AstNode* AstNode::inject_at(uint32_t index, AstUnary* node) {
+  AstNode* child = child_at(index);
 
-  MATHPRESSO_ASSERT(node != NULL && node->parent() == NULL);
-  MATHPRESSO_ASSERT(child != NULL);
+  MATHPRESSO_ASSERT(node != nullptr && node->parent() == nullptr);
+  MATHPRESSO_ASSERT(child != nullptr);
 
   _children[index] = node;
   child->_parent = node;
@@ -279,12 +280,12 @@ AstNode* AstNode::injectAt(uint32_t index, AstUnary* node) {
 // MathPresso - AstBlock
 // =====================
 
-static Error mpBlockNodeGrow(AstBlock* self) {
-  size_t oldCapacity = self->_capacity;
-  size_t newCapacity = oldCapacity;
+static Error block_node_grow(AstBlock* self) {
+  size_t old_capacity = self->_capacity;
+  size_t new_capacity = old_capacity;
 
   size_t size = self->_size;
-  MATHPRESSO_ASSERT(oldCapacity == size);
+  MATHPRESSO_ASSERT(old_capacity == size);
 
   // Grow, we prefer growing quickly until we reach 128 and then 1024 nodes. We
   // don't expect to reach these limits in the most used expressions; only test
@@ -292,81 +293,83 @@ static Error mpBlockNodeGrow(AstBlock* self) {
   //
   // Growing schema:
   //   0..4..8..16..32..64..128..256..384..512..640..768..896..1024..[+256]
-  if (newCapacity == 0)
-    newCapacity = 4;
-  else if (newCapacity < 128)
-    newCapacity *= 2;
-  else if (newCapacity < 1024)
-    newCapacity += 128;
+  if (new_capacity == 0)
+    new_capacity = 4;
+  else if (new_capacity < 128)
+    new_capacity *= 2;
+  else if (new_capacity < 1024)
+    new_capacity += 128;
   else
-    newCapacity += 256;
+    new_capacity += 256;
 
-  ZoneAllocator* allocator = self->ast()->allocator();
+  Arena& arena = self->ast()->arena();
 
-  AstNode** oldArray = self->children();
-  AstNode** newArray = static_cast<AstNode**>(allocator->alloc(newCapacity * sizeof(AstNode), newCapacity));
+  size_t allocated_capacity;
+  AstNode** old_array = self->children();
+  AstNode** new_array = arena.alloc_reusable<AstNode*>(Arena::aligned_size(new_capacity * sizeof(AstNode)), asmjit::Out(allocated_capacity));
 
-  MATHPRESSO_NULLCHECK(newArray);
-  newCapacity /= sizeof(AstNode*);
+  MATHPRESSO_NULLCHECK(new_array);
+  allocated_capacity /= sizeof(AstNode*);
 
-  self->_children = newArray;
-  self->_capacity = static_cast<uint32_t>(newCapacity);
+  self->_children = new_array;
+  self->_capacity = static_cast<uint32_t>(allocated_capacity);
 
-  if (oldCapacity != 0) {
-    ::memcpy(newArray, oldArray, size * sizeof(AstNode*));
-    allocator->release(oldArray, oldCapacity * sizeof(AstNode*));
+  if (old_capacity != 0) {
+    ::memcpy(new_array, old_array, size * sizeof(AstNode*));
+    arena.free_reusable(old_array, old_capacity * sizeof(AstNode*));
   }
 
   return kErrorOk;
 }
 
-Error AstBlock::willAdd() {
+Error AstBlock::will_add() {
   // Grow if needed.
-  if (_size == _capacity)
-    MATHPRESSO_PROPAGATE(mpBlockNodeGrow(this));
+  if (_size == _capacity) {
+    MATHPRESSO_PROPAGATE(block_node_grow(this));
+  }
   return kErrorOk;
 }
 
-AstNode* AstBlock::removeNode(AstNode* node) {
-  MATHPRESSO_ASSERT(node != NULL);
+AstNode* AstBlock::remove_node(AstNode* node) {
+  MATHPRESSO_ASSERT(node != nullptr);
   MATHPRESSO_ASSERT(node->parent() == this);
 
-  AstNode** p = children();
-  AstNode** pEnd = p + _size;
+  AstNode** ptr = children();
+  AstNode** ptr_end = ptr + _size;
 
-  while (p != pEnd) {
-    if (p[0] == node)
+  while (ptr != ptr_end) {
+    if (ptr[0] == node)
       goto _Found;
-    p++;
+    ptr++;
   }
 
-  // If removeNode() has been called we expect the node to be found. Otherwise
+  // If remove_node() has been called we expect the node to be found. Otherwise
   // there is a bug somewhere.
   MATHPRESSO_ASSERT(!"Reached");
-  return NULL;
+  return nullptr;
 
 _Found:
   _size--;
-  ::memmove(p, p + 1, static_cast<size_t>(pEnd - p - 1) * sizeof(AstNode*));
+  ::memmove(ptr, ptr + 1, static_cast<size_t>(ptr_end - ptr - 1) * sizeof(AstNode*));
 
-  node->_parent = NULL;
+  node->_parent = nullptr;
   return node;
 }
 
-AstNode* AstBlock::removeAt(uint32_t index) {
+AstNode* AstBlock::remove_at(uint32_t index) {
   MATHPRESSO_ASSERT(index < _size);
 
   if (index >= _size)
-    return NULL;
+    return nullptr;
 
-  AstNode** p = children() + index;
-  AstNode* oldNode = p[0];
+  AstNode** ptr = children() + index;
+  AstNode* old_node = ptr[0];
 
   _size--;
-  ::memmove(p, p + 1, static_cast<size_t>(_size - index) * sizeof(AstNode*));
+  ::memmove(ptr, ptr + 1, static_cast<size_t>(_size - index) * sizeof(AstNode*));
 
-  oldNode->_parent = NULL;
-  return oldNode;
+  old_node->_parent = nullptr;
+  return old_node;
 }
 
 // MathPresso - AstVisitor
@@ -376,24 +379,24 @@ AstVisitor::AstVisitor(AstBuilder* ast)
   : _ast(ast) {}
 AstVisitor::~AstVisitor() {}
 
-Error AstVisitor::onNode(AstNode* node) {
-  switch (node->nodeType()) {
-    case kAstNodeProgram  : return onProgram  (static_cast<AstProgram*  >(node));
-    case kAstNodeBlock    : return onBlock    (static_cast<AstBlock*    >(node));
-    case kAstNodeVarDecl  : return onVarDecl  (static_cast<AstVarDecl*  >(node));
-    case kAstNodeVar      : return onVar      (static_cast<AstVar*      >(node));
-    case kAstNodeImm      : return onImm      (static_cast<AstImm*      >(node));
-    case kAstNodeUnaryOp  : return onUnaryOp  (static_cast<AstUnaryOp*  >(node));
-    case kAstNodeBinaryOp : return onBinaryOp (static_cast<AstBinaryOp* >(node));
-    case kAstNodeCall     : return onCall     (static_cast<AstCall*     >(node));
+Error AstVisitor::on_node(AstNode* node) {
+  switch (node->node_type()) {
+    case kAstNodeProgram  : return on_program  (static_cast<AstProgram*  >(node));
+    case kAstNodeBlock    : return on_block    (static_cast<AstBlock*    >(node));
+    case kAstNodeVarDecl  : return on_var_decl (static_cast<AstVarDecl*  >(node));
+    case kAstNodeVar      : return on_var      (static_cast<AstVar*      >(node));
+    case kAstNodeImm      : return on_imm      (static_cast<AstImm*      >(node));
+    case kAstNodeUnaryOp  : return on_unary_op (static_cast<AstUnaryOp*  >(node));
+    case kAstNodeBinaryOp : return on_binary_op(static_cast<AstBinaryOp* >(node));
+    case kAstNodeCall     : return on_invoke   (static_cast<AstCall*     >(node));
 
     default:
       return MATHPRESSO_TRACE_ERROR(kErrorInvalidState);
   }
 }
 
-Error AstVisitor::onProgram(AstProgram* node) {
-  return onBlock(node);
+Error AstVisitor::on_program(AstProgram* node) {
+  return on_block(node);
 }
 
 // MathPresso - AstDump
@@ -405,55 +408,55 @@ AstDump::AstDump(AstBuilder* ast, String& sb)
     _level(0) {}
 AstDump::~AstDump() {}
 
-Error AstDump::onBlock(AstBlock* node) {
+Error AstDump::on_block(AstBlock* node) {
   AstNode** children = node->children();
   uint32_t i, size = node->size();
 
   for (i = 0; i < size; i++)
-    onNode(children[i]);
+    on_node(children[i]);
 
   return kErrorOk;
 }
 
-Error AstDump::onVarDecl(AstVarDecl* node) {
+Error AstDump::on_var_decl(AstVarDecl* node) {
   AstSymbol* sym = node->symbol();
 
-  nest("%s [VarDecl]", sym ? sym->name() : static_cast<const char*>(NULL));
+  nest("%s [VarDecl]", sym ? sym->name() : static_cast<const char*>(nullptr));
   if (node->child())
-    MATHPRESSO_PROPAGATE(onNode(node->child()));
+    MATHPRESSO_PROPAGATE(on_node(node->child()));
   return denest();
 }
 
-Error AstDump::onVar(AstVar* node) {
+Error AstDump::on_var(AstVar* node) {
   AstSymbol* sym = node->symbol();
-  return info("%s", sym ? sym->name() : static_cast<const char*>(NULL));
+  return info("%s", sym ? sym->name() : static_cast<const char*>(nullptr));
 }
 
-Error AstDump::onImm(AstImm* node) {
+Error AstDump::on_imm(AstImm* node) {
   return info("%f", node->_value);
 }
 
-Error AstDump::onUnaryOp(AstUnaryOp* node) {
-  nest("%s [Unary]", OpInfo::get(node->opType()).name);
+Error AstDump::on_unary_op(AstUnaryOp* node) {
+  nest("%s [Unary]", OpInfo::get(node->op_type()).name);
   if (node->child())
-    MATHPRESSO_PROPAGATE(onNode(node->child()));
+    MATHPRESSO_PROPAGATE(on_node(node->child()));
   return denest();
 }
 
-Error AstDump::onBinaryOp(AstBinaryOp* node) {
-  nest("%s [Binary]", OpInfo::get(node->opType()).name);
+Error AstDump::on_binary_op(AstBinaryOp* node) {
+  nest("%s [Binary]", OpInfo::get(node->op_type()).name);
   if (node->left())
-    MATHPRESSO_PROPAGATE(onNode(node->left()));
+    MATHPRESSO_PROPAGATE(on_node(node->left()));
   if (node->right())
-    MATHPRESSO_PROPAGATE(onNode(node->right()));
+    MATHPRESSO_PROPAGATE(on_node(node->right()));
   return denest();
 }
 
-Error AstDump::onCall(AstCall* node) {
+Error AstDump::on_invoke(AstCall* node) {
   AstSymbol* sym = node->symbol();
 
-  nest("%s()", sym ? sym->name() : static_cast<const char*>(NULL));
-  onBlock(node);
+  nest("%s()", sym ? sym->name() : static_cast<const char*>(nullptr));
+  on_block(node);
   return denest();
 }
 
@@ -461,8 +464,8 @@ Error AstDump::info(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
 
-  _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
-  _sb.appendVFormat(fmt, ap);
+  _sb.append_chars(' ', static_cast<size_t>(_level) * 2);
+  _sb.append_vformat(fmt, ap);
   _sb.append('\n');
 
   va_end(ap);
@@ -473,8 +476,8 @@ Error AstDump::nest(const char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
 
-  _sb.appendChars(' ', static_cast<size_t>(_level) * 2);
-  _sb.appendVFormat(fmt, ap);
+  _sb.append_chars(' ', static_cast<size_t>(_level) * 2);
+  _sb.append_vformat(fmt, ap);
   _sb.append('\n');
 
   va_end(ap);

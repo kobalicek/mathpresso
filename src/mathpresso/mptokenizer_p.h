@@ -105,7 +105,7 @@ struct Token {
   //! Token type.
   uint32_t _tokenType;
   //! Token hash-code (only if the token is symbol or keyword).
-  uint32_t _hashCode;
+  uint32_t _hash_code;
   //! Token position from the beginning of the input.
   size_t _position;
   //! Token size.
@@ -126,17 +126,17 @@ struct Token {
   // Accessors
   // ---------
 
-  inline uint32_t setData(size_t position, size_t size, uint32_t hashCode, uint32_t tokenType) {
+  inline uint32_t set_data(size_t position, size_t size, uint32_t hash_code, uint32_t tokenType) {
     _position = position;
     _size = size;
-    _hashCode = hashCode;
+    _hash_code = hash_code;
     _tokenType = tokenType;
 
     return tokenType;
   }
 
   inline uint32_t tokenType() const noexcept { return _tokenType; }
-  inline uint32_t hashCode() const noexcept { return _hashCode; }
+  inline uint32_t hash_code() const noexcept { return _hash_code; }
 
   inline size_t position() const noexcept { return _position; }
   inline size_t size() const noexcept { return _size; }

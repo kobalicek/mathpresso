@@ -36,37 +36,37 @@ struct Parser {
   // -------
 
   AstBuilder* _ast;
-  ErrorReporter* _errorReporter;
+  ErrorReporter* _error_reporter;
 
-  AstScope* _currentScope;
+  AstScope* _current_scope;
   Tokenizer _tokenizer;
 
   // Construction & Destruction
   // --------------------------
 
-  MATHPRESSO_INLINE Parser(AstBuilder* ast, ErrorReporter* errorReporter, const char* body, size_t size)
+  MATHPRESSO_INLINE Parser(AstBuilder* ast, ErrorReporter* error_reporter, const char* body, size_t size)
     : _ast(ast),
-      _errorReporter(errorReporter),
-      _currentScope(ast->rootScope()),
+      _error_reporter(error_reporter),
+      _current_scope(ast->root_scope()),
       _tokenizer(body, size) {}
   MATHPRESSO_INLINE ~Parser() {}
 
   // Accessors
   // ---------
 
-  MATHPRESSO_INLINE AstScope* currentScope() const { return _currentScope; }
+  MATHPRESSO_INLINE AstScope* current_scope() const { return _current_scope; }
 
   // Parse
   // -----
 
-  MATHPRESSO_NOAPI Error parseProgram(AstProgram* block);
+  MATHPRESSO_NOAPI Error parse_program(AstProgram* block);
 
-  MATHPRESSO_NOAPI Error parseStatement(AstBlock* block, uint32_t flags);
-  MATHPRESSO_NOAPI Error parseBlockOrStatement(AstBlock* block);
+  MATHPRESSO_NOAPI Error parse_statement(AstBlock* block, uint32_t flags);
+  MATHPRESSO_NOAPI Error parse_block_or_statement(AstBlock* block);
 
-  MATHPRESSO_NOAPI Error parseVariableDecl(AstBlock* block);
-  MATHPRESSO_NOAPI Error parseExpression(AstNode** pNodeOut, bool isNested);
-  MATHPRESSO_NOAPI Error parseCall(AstNode** pNodeOut);
+  MATHPRESSO_NOAPI Error parse_variable_decl(AstBlock* block);
+  MATHPRESSO_NOAPI Error parse_expression(AstNode** pNodeOut, bool isNested);
+  MATHPRESSO_NOAPI Error parse_call(AstNode** pNodeOut);
 };
 
 } // {mathpresso}

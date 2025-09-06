@@ -43,10 +43,10 @@ int main() {
   variables.y = 0.0;
   variables.z = 0.0;
 
-  ctx.addBuiltIns();
-  ctx.addVariable("x", MATHPRESSO_OFFSET(Variables, x));
-  ctx.addVariable("y", MATHPRESSO_OFFSET(Variables, y));
-  ctx.addVariable("z", MATHPRESSO_OFFSET(Variables, z));
+  ctx.add_builtins();
+  ctx.add_variable("x", MATHPRESSO_OFFSET(Variables, x));
+  ctx.add_variable("y", MATHPRESSO_OFFSET(Variables, y));
+  ctx.add_variable("z", MATHPRESSO_OFFSET(Variables, z));
 
   fprintf(stdout, "=========================================================\n");
   fprintf(stdout, "MPEval - MathPresso's Command Line Evaluator\n");

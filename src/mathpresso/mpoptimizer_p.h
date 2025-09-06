@@ -22,21 +22,21 @@ struct AstOptimizer : public AstVisitor {
   // Members
   // -------
 
-  ErrorReporter* _errorReporter;
+  ErrorReporter* _error_reporter;
 
   // Construction & Destruction
   // --------------------------
 
-  AstOptimizer(AstBuilder* ast, ErrorReporter* errorReporter);
+  AstOptimizer(AstBuilder* ast, ErrorReporter* error_reporter);
   virtual ~AstOptimizer();
 
-  virtual Error onBlock(AstBlock* node);
-  virtual Error onVarDecl(AstVarDecl* node);
-  virtual Error onVar(AstVar* node);
-  virtual Error onImm(AstImm* node);
-  virtual Error onUnaryOp(AstUnaryOp* node);
-  virtual Error onBinaryOp(AstBinaryOp* node);
-  virtual Error onCall(AstCall* node);
+  virtual Error on_block(AstBlock* node);
+  virtual Error on_var_decl(AstVarDecl* node);
+  virtual Error on_var(AstVar* node);
+  virtual Error on_imm(AstImm* node);
+  virtual Error on_unary_op(AstUnaryOp* node);
+  virtual Error on_binary_op(AstBinaryOp* node);
+  virtual Error on_invoke(AstCall* node);
 };
 
 } // {mathpresso}

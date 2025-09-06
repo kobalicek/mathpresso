@@ -39,7 +39,7 @@ Features
     * Greater or equal `x >= y`
     * Lesser `x < y`
     * Lesser or equal `x <= y`
-  * Functions defined by `addBuiltIns()`:
+  * Functions defined by `add_builtins()`:
     * Check for NaN `isnan(x)`
     * Check for infinity `isinf(x)`
     * Check for finite number `isfinite(x)`
@@ -72,7 +72,7 @@ Features
     * Arccosine `acos(x)`
     * Arctangent `atan(x)`
     * Arctangent `atan2(x, y)`
-  * Constants defined by `addBuiltIns()`:
+  * Constants defined by `add_builtins()`:
     * Infinity `INF`
     * Not a Number `NaN`
     * Euler's constant `E = 2.7182818284590452354`
@@ -94,17 +94,17 @@ int main(int argc, char* argv[]) {
 
   // Initialize the context by adding MathPresso built-ins. Without this line
   // functions like round(), sin(), etc won't be available.
-  ctx.addBuiltIns();
+  ctx.add_builtins();
 
   // Let the context know the name of the variables we will refer to and
   // their positions in the data pointer. We will use an array of 3 doubles,
   // so index them by using `sizeof(double)`, like a normal C array.
   //
-  // The `addVariable()` also contains a third parameter that describes
+  // The `add_variable()` also contains a third parameter that describes
   // variable flags, use `kVariableRO` to make a certain variable read-only.
-  ctx.addVariable("x", 0 * sizeof(double));
-  ctx.addVariable("y", 1 * sizeof(double));
-  ctx.addVariable("z", 2 * sizeof(double));
+  ctx.add_variable("x", 0 * sizeof(double));
+  ctx.add_variable("y", 1 * sizeof(double));
+  ctx.add_variable("z", 2 * sizeof(double));
 
   // Compile the expression.
   //
@@ -151,10 +151,10 @@ int main(int argc, char* argv[]) {
   mathpresso::Context ctx;
   mathpresso::Expression exp;
 
-  ctx.addBuiltIns();
-  ctx.addVariable("x", MATHPRESSO_OFFSET(Data, x));
-  ctx.addVariable("y", MATHPRESSO_OFFSET(Data, y));
-  ctx.addVariable("z", MATHPRESSO_OFFSET(Data, z));
+  ctx.add_builtins();
+  ctx.add_variable("x", MATHPRESSO_OFFSET(Data, x));
+  ctx.add_variable("y", MATHPRESSO_OFFSET(Data, y));
+  ctx.add_variable("z", MATHPRESSO_OFFSET(Data, z));
 
   mathpresso::Error err = exp.compile(ctx, "(x*y) % z", mathpresso::kNoOptions);
   if (err != mathpresso::kErrorOk) {
@@ -231,14 +231,14 @@ struct MyOutputLog : public mathpresso::OutputLog {
 };
 
 int main(int argc, char* argv[]) {
-  MyOutputLog outputLog;
+  MyOutputLog output_log;
 
   // Create the context, add builtins and define the `Data` layout.
   mathpresso::Context ctx;
-  ctx.addBuiltIns();
-  ctx.addVariable("x"  , MATHPRESSO_OFFSET(Data, x));
-  ctx.addVariable("y"  , MATHPRESSO_OFFSET(Data, y));
-  ctx.addVariable("z"  , MATHPRESSO_OFFSET(Data, z));
+  ctx.add_builtins();
+  ctx.add_variable("x"  , MATHPRESSO_OFFSET(Data, x));
+  ctx.add_variable("y"  , MATHPRESSO_OFFSET(Data, y));
+  ctx.add_variable("z"  , MATHPRESSO_OFFSET(Data, z));
 
   // The following options will cause that MathPresso will send everything
   // it does to `OutputLog`.
@@ -249,7 +249,7 @@ int main(int argc, char* argv[]) {
 
   mathpresso::Expression exp;
   mathpresso::Error err = exp.compile(ctx,
-    "-(-(abs(x * y - floor(x)))) * z * (12.9 - 3)", options, &outputLog);
+    "-(-(abs(x * y - floor(x)))) * z * (12.9 - 3)", options, &output_log);
 
   // Handle possible syntax or compilation error. The OutputLog has already
   // received and printed the reason in a human readable form.

@@ -18,39 +18,41 @@ namespace mathpresso {
 
 namespace HashUtils {
   // \internal
-  static MATHPRESSO_INLINE uint32_t hashPointer(const void* kPtr) {
+  static MATHPRESSO_INLINE uint32_t hash_pointer(const void* kPtr) {
     uintptr_t p = (uintptr_t)kPtr;
     return static_cast<uint32_t>(
       ((p >> 3) ^ (p >> 7) ^ (p >> 12) ^ (p >> 20) ^ (p >> 27)) & 0xFFFFFFFFu);
   }
 
   // \internal
-  static MATHPRESSO_INLINE uint32_t hashChar(uint32_t hash, uint32_t c) {
+  static MATHPRESSO_INLINE uint32_t hash_char(uint32_t hash, uint32_t c) {
     return hash * 65599 + c;
   }
 
   // \internal
   //
   // Get a hash of the given string `data` of size `size`. This function doesn't
-  // require `key` to be NULL terminated.
-  MATHPRESSO_NOAPI uint32_t hashString(const char* data, size_t size);
+  // require `key` to be nullptr terminated.
+  MATHPRESSO_NOAPI uint32_t hash_string(const char* data, size_t size);
 
   // \internal
   //
   // Get a prime number that is close to `x`, but always greater than or equal to `x`.
-  MATHPRESSO_NOAPI uint32_t closestPrime(uint32_t x);
+  MATHPRESSO_NOAPI uint32_t closest_prime(uint32_t x);
 };
 
 // MathPresso - HashNode
 // =====================
 
 struct HashNode {
-  MATHPRESSO_INLINE HashNode(uint32_t hashCode = 0) : _next(NULL), _hashCode(hashCode) {}
+  MATHPRESSO_INLINE HashNode(uint32_t hash_code = 0)
+    : _next(nullptr),
+      _hash_code(hash_code) {}
 
-  //! Next node in the chain, NULL if last node.
+  //! Next node in the chain, nullptr if last node.
   HashNode* _next;
   //! Hash code.
-  uint32_t _hashCode;
+  uint32_t _hash_code;
 };
 
 // MathPresso - HashBase
@@ -67,11 +69,11 @@ struct HashBase {
   // Members
   // -------
 
-  ZoneAllocator* _allocator;
+  Arena& _arena;
 
   uint32_t _size;
-  uint32_t _bucketsCount;
-  uint32_t _bucketsGrow;
+  uint32_t _buckets_count;
+  uint32_t _buckets_grow;
 
   HashNode** _data;
   HashNode* _embedded[1 + kExtraCount];
@@ -79,33 +81,33 @@ struct HashBase {
   // Construction & Destruction
   // --------------------------
 
-  MATHPRESSO_INLINE HashBase(ZoneAllocator* allocator) {
-    _allocator = allocator;
+  MATHPRESSO_INLINE HashBase(Arena& arena) : _arena(arena) {
     _size = 0;
 
-    _bucketsCount = 1;
-    _bucketsGrow = 1;
+    _buckets_count = 1;
+    _buckets_grow = 1;
 
     _data = _embedded;
     for (uint32_t i = 0; i <= kExtraCount; i++)
-      _embedded[i] = NULL;
+      _embedded[i] = nullptr;
   }
 
   MATHPRESSO_INLINE ~HashBase() {
-    if (_data != _embedded)
-      _allocator->release(_data, static_cast<size_t>(_bucketsCount + kExtraCount) * sizeof(void*));
+    if (_data != _embedded) {
+      _arena.free_reusable(_data, static_cast<size_t>(_buckets_count + kExtraCount) * sizeof(void*));
+    }
   }
 
   // Accessors
   // ---------
 
-  MATHPRESSO_INLINE ZoneAllocator* allocator() const { return _allocator; }
+  MATHPRESSO_INLINE Arena& arena() const { return _arena; }
 
   // Operations
   // ----------
 
-  MATHPRESSO_NOAPI void _rehash(uint32_t newCount);
-  MATHPRESSO_NOAPI void _mergeToInvisibleSlot(HashBase& other);
+  MATHPRESSO_NOAPI void _rehash(uint32_t new_count);
+  MATHPRESSO_NOAPI void _merge_to_invisible_slot(HashBase& other);
 
   MATHPRESSO_NOAPI HashNode* _put(HashNode* node);
   MATHPRESSO_NOAPI HashNode* _del(HashNode* node);
@@ -138,8 +140,8 @@ struct Hash : public HashBase {
   // Construction & Destruction
   // --------------------------
 
-  MATHPRESSO_INLINE Hash(ZoneAllocator* allocator)
-    : HashBase(allocator) {}
+  MATHPRESSO_INLINE Hash(Arena& arena)
+    : HashBase(arena) {}
 
   // Operations
   // ----------
@@ -147,46 +149,47 @@ struct Hash : public HashBase {
   template<typename ReleaseHandler>
   void reset(ReleaseHandler& handler) {
     HashNode** data = _data;
-    uint32_t count = _bucketsCount + kExtraCount;
+    uint32_t count = _buckets_count + kExtraCount;
 
     for (uint32_t i = 0; i < count; i++) {
       HashNode* node = data[i];
 
-      while (node != NULL) {
+      while (node != nullptr) {
         HashNode* next = node->_next;
         handler.release(static_cast<Node*>(node));
         node = next;
       }
     }
 
-    if (data != _embedded)
-      _allocator->release(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
+    if (data != _embedded) {
+      _arena.free_reusable(data, static_cast<size_t>(count + kExtraCount) * sizeof(void*));
+    }
 
-    _bucketsCount = 1;
-    _bucketsGrow = 1;
+    _buckets_count = 1;
+    _buckets_grow = 1;
 
     _size = 0;
     _data = _embedded;
 
     for (uint32_t i = 0; i <= kExtraCount; i++)
-      _embedded[i] = NULL;
+      _embedded[i] = nullptr;
   }
 
-  MATHPRESSO_INLINE void mergeToInvisibleSlot(Hash<Key, Node>& other) {
-    _mergeToInvisibleSlot(other);
+  MATHPRESSO_INLINE void merge_to_invisible_slot(Hash<Key, Node>& other) {
+    _merge_to_invisible_slot(other);
   }
 
-  MATHPRESSO_INLINE Node* get(const Key& key, uint32_t hashCode) const {
-    uint32_t hMod = hashCode % _bucketsCount;
-    Node* node = static_cast<Node*>(_data[hMod]);
+  MATHPRESSO_INLINE Node* get(const Key& key, uint32_t hash_code) const {
+    uint32_t hash_mod = hash_code % _buckets_count;
+    Node* node = static_cast<Node*>(_data[hash_mod]);
 
-    while (node != NULL) {
+    while (node != nullptr) {
       if (node->eq(key))
         return node;
       node = static_cast<Node*>(node->_next);
     }
 
-    return NULL;
+    return nullptr;
   }
 
   MATHPRESSO_INLINE Node* put(Node* node) { return static_cast<Node*>(_put(node)); }
@@ -205,9 +208,9 @@ struct HashIterator {
     Node* node = buckets[0];
 
     uint32_t index = 0;
-    uint32_t count = hash._bucketsCount;
+    uint32_t count = hash._buckets_count;
 
-    while (node == NULL && ++index < count)
+    while (node == nullptr && ++index < count)
       node = buckets[index];
 
     _node = node;
@@ -216,7 +219,7 @@ struct HashIterator {
     _index = index;
     _count = count;
 
-    return node != NULL;
+    return node != nullptr;
   }
 
   MATHPRESSO_INLINE bool next() {
@@ -224,22 +227,22 @@ struct HashIterator {
     MATHPRESSO_ASSERT(has());
 
     Node* node = static_cast<Node*>(_node->_next);
-    if (node == NULL) {
+    if (node == nullptr) {
       uint32_t index = _index;
       uint32_t count = _count;
 
       while (++index < count) {
         node = _buckets[index];
-        if (node != NULL) break;
+        if (node != nullptr) break;
       }
       _index = index;
     }
 
     _node = node;
-    return node != NULL;
+    return node != nullptr;
   }
 
-  MATHPRESSO_INLINE bool has() const { return _node != NULL; }
+  MATHPRESSO_INLINE bool has() const { return _node != nullptr; }
   MATHPRESSO_INLINE Node* get() const { return _node; }
 
   Node* _node;
@@ -258,8 +261,8 @@ struct Map {
   MATHPRESSO_NONCOPYABLE(Map)
 
   struct Node : public HashNode {
-    MATHPRESSO_INLINE Node(const Key& key, const Value& value, uint32_t hashCode)
-      : HashNode(hashCode),
+    MATHPRESSO_INLINE Node(const Key& key, const Value& value, uint32_t hash_code)
+      : HashNode(hash_code),
         _key(key),
         _value(value) {}
     MATHPRESSO_INLINE bool eq(const Key& key) { return _key == key; }
@@ -269,10 +272,10 @@ struct Map {
   };
 
   struct ReleaseHandler {
-    MATHPRESSO_INLINE ReleaseHandler(ZoneAllocator* allocator) : _allocator(allocator) {}
-    MATHPRESSO_INLINE void release(Node* node) { _allocator->release(node, sizeof(Node)); }
+    Arena& _arena;
 
-    ZoneAllocator* _allocator;
+    MATHPRESSO_INLINE explicit ReleaseHandler(Arena& arena) : _arena(arena) {}
+    MATHPRESSO_INLINE void release(Node* node) { _arena.free_reusable(node, sizeof(Node)); }
   };
 
   // Members
@@ -283,38 +286,40 @@ struct Map {
   // Construction & Destruction
   // --------------------------
 
-  MATHPRESSO_INLINE Map(ZoneAllocator* allocator)
-    : _hash(allocator) {}
+  MATHPRESSO_INLINE Map(Arena& arena)
+    : _hash(arena) {}
 
   MATHPRESSO_INLINE ~Map() {
-    ReleaseHandler releaseHandler(_hash.allocator());
-    _hash.reset(releaseHandler);
+    ReleaseHandler release_handler(_hash.arena());
+    _hash.reset(release_handler);
   }
 
   // Operations
   // ----------
 
   MATHPRESSO_INLINE Value get(const Key& key) const {
-    uint32_t hashCode = HashUtils::hashPointer(key);
-    uint32_t hMod = hashCode % _hash._bucketsCount;
-    Node* node = static_cast<Node*>(_hash._data[hMod]);
+    uint32_t hash_code = HashUtils::hash_pointer(key);
+    uint32_t hash_mod = hash_code % _hash._buckets_count;
+    Node* node = static_cast<Node*>(_hash._data[hash_mod]);
 
-    while (node != NULL) {
-      if (node->eq(key))
+    while (node != nullptr) {
+      if (node->eq(key)) {
         return node->_value;
+      }
       node = static_cast<Node*>(node->_next);
     }
 
-    return NULL;
+    return nullptr;
   }
 
   MATHPRESSO_INLINE Error put(const Key& key, const Value& value) {
-    Node* node = static_cast<Node*>(_hash._allocator->alloc(sizeof(Node)));
-    if (node == NULL)
+    Node* node = static_cast<Node*>(_hash._arena.alloc_oneshot(sizeof(Node)));
+    if (node == nullptr) {
       return MATHPRESSO_TRACE_ERROR(kErrorNoMemory);
+    }
 
-    uint32_t hashCode = HashUtils::hashPointer(key);
-    _hash.put(new(node) Node(key, value, hashCode));
+    uint32_t hash_code = HashUtils::hash_pointer(key);
+    _hash.put(new(node) Node(key, value, hash_code));
 
     return kErrorOk;
   }
