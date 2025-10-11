@@ -10,7 +10,8 @@
 
 // [Dependencies]
 #include "./mathpresso.h"
-#include <asmjit/x86.h>
+
+#include <asmjit/core.h>
 
 #include <limits.h>
 #include <math.h>
@@ -23,48 +24,8 @@
 #include <new>
 
 #if defined(_MSC_VER)
-#include <windows.h>
-# if _MSC_VER >= 1400
-#  include <intrin.h>
-# endif // _MSC_VER >= 1400
-#endif // _MSC_VER
-
-// MathPresso Architecture
-// =======================
-
-#if (defined(_M_X64  ) || defined(__x86_64) || defined(__x86_64__) || \
-     defined(_M_AMD64) || defined(__amd64 ) || defined(__amd64__ ))
-# define MATHPRESSO_ARCH_X64          (1)
-#else
-# define MATHPRESSO_ARCH_X64          (0)
-#endif
-#if (defined(_M_IX86 ) || defined(__X86__ ) || defined(__i386  ) || \
-     defined(__IA32__) || defined(__I86__ ) || defined(__i386__) || \
-     defined(__i486__) || defined(__i586__) || defined(__i686__))
-# define MATHPRESSO_ARCH_X86          (!MATHPRESSO_ARCH_X64)
-#else
-# define MATHPRESSO_ARCH_X86          (0)
-#endif
-
-#if (defined(_M_ARM  ) || defined(__arm__ ) || defined(__arm) || \
-     defined(_M_ARMT ) || defined(__thumb__))
-# define MATHPRESSO_ARCH_ARM          (1)
-# define MATHPRESSO_ARCH_ARM64        (0)
-#else
-# define MATHPRESSO_ARCH_ARM          (0)
-# define MATHPRESSO_ARCH_ARM64        (0)
-#endif
-
-#if MATHPRESSO_ARCH_X86 || MATHPRESSO_ARCH_X64
-# define MATHPRESSO_ARCH_64BIT        (MATHPRESSO_ARCH_X64)
-# define MATHPRESSO_ARCH_BE           (0)
-# define MATHPRESSO_ARCH_LE           (1)
-#endif
-
-#if MATHPRESSO_ARCH_ARM || MATHPRESSO_ARCH_ARM64
-# define MATHPRESSO_ARCH_64BIT        (MATHPRESSO_ARCH_ARM64)
-# define MATHPRESSO_ARCH_BE           (0)
-# define MATHPRESSO_ARCH_LE           (1)
+  #include <windows.h>
+  #include <intrin.h>
 #endif
 
 // MathPresso Likely & Unlikely
@@ -155,11 +116,12 @@ enum OpType {
   kOpIsFinite,          // isfinite(a)
   kOpSignBit,           // signbit(a)
 
-  kOpRound,             // round(a)
-  kOpRoundEven,         // roundeven(a)
   kOpTrunc,             // trunc(a)
   kOpFloor,             // floor(a)
   kOpCeil,              // ceil(a)
+  kOpRoundEven,         // round_even(a)
+  kOpRoundHalfAway,     // round_half_away(a)
+  kOpRoundHalfUp,       // round_half_up(a)
 
   kOpAbs,               // abs(a)
   kOpExp,               // exp(a)
@@ -287,7 +249,7 @@ struct OpInfo {
   uint8_t precedence;
   uint8_t reserved;
   uint32_t flags;
-  char name[12];
+  char name[16];
 
   // Statics
   // -------

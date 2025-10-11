@@ -157,13 +157,22 @@ enum Options {
   //! Debug AsmJit's compiler.
   kOptionDebugCompiler = 0x0008u,
 
-  //! Do not use SSE4.1 instruction set even if CPU supports it.
+  //! Do not use SSE4.1 extension even if CPU supports it.
   //!
-  //! \note This is used during testing to ensure that all code-paths produce
-  //! the same results regardless of the highest instruction set used. Since
-  //! SSE4.1 is the most beneficial instruction set for MathPresso there is
-  //! only this option (MathPresso doesn't use SSE3 and SSSE3 at the moment).
-  kOptionDisableSSE4_1 = 0x4000u,
+  //! \note This should only be used to test various code generation implementations, which normally detect
+  //! the supported CPU extensions and then emit code for the given CPU. MathPresso generally doesn't benefit
+  //! from SSE3 and SSSE3 on X86 hardware as the interesting ISA extensions only start from SSE4.1.
+  kOptionDisableSSE4_1 = 0x1000u,
+
+  //! Do not use AVX extensions even if CPU supports it.
+  //!
+  //! \note This should only be used to test various code generation implementations.
+  kOptionDisableAVX = 0x2000u,
+
+  //! Do not use AVX-512 extensions even if CPU supports it.
+  //!
+  //! \note This should only be used to test various code generation implementations.
+  kOptionDisableAVX512 = 0x4000u,
 
   //! \internal
   //!

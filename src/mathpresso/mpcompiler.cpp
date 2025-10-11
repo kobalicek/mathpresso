@@ -12,6 +12,8 @@
 #include "./mpcompiler_p.h"
 #include "./mpeval_p.h"
 
+#include <asmjit/ujit.h>
+
 namespace mathpresso {
 
 using namespace asmjit;
@@ -24,49 +26,65 @@ struct JitGlobal {
 };
 static JitGlobal jit_global;
 
+// MathPresso - JIT Error Handler
+// ==============================
+
+class JitErrorHandler : public ErrorHandler {
+public:
+  asmjit::Error _err {};
+
+  void handle_error(asmjit::Error err, const char* message, asmjit::BaseEmitter* origin) override {
+    Support::maybe_unused(origin);
+
+    _err = err;
+    fprintf(stderr, "AsmJit error: %s\n", message);
+  }
+};
+
 // MathPresso - JIT Utilities
 // ==========================
 
 struct JitUtils {
   static void* func_by_op(uint32_t op) {
     switch (op) {
-      case kOpIsNan    : return (void*)(Arg1Func)mp_is_nan;
-      case kOpIsInf    : return (void*)(Arg1Func)mp_is_inf;
-      case kOpIsFinite : return (void*)(Arg1Func)mp_is_finite;
-      case kOpSignBit  : return (void*)(Arg1Func)mp_sign_bit;
+      case kOpIsNan        : return (void*)(Arg1Func)mp_is_nan;
+      case kOpIsInf        : return (void*)(Arg1Func)mp_is_inf;
+      case kOpIsFinite     : return (void*)(Arg1Func)mp_is_finite;
+      case kOpSignBit      : return (void*)(Arg1Func)mp_sign_bit;
 
-      case kOpRound    : return (void*)(Arg1Func)mp_round;
-      case kOpRoundEven: return (void*)(Arg1Func)rint;
-      case kOpTrunc    : return (void*)(Arg1Func)trunc;
-      case kOpFloor    : return (void*)(Arg1Func)floor;
-      case kOpCeil     : return (void*)(Arg1Func)ceil;
+      case kOpTrunc        : return (void*)(Arg1Func)trunc;
+      case kOpFloor        : return (void*)(Arg1Func)floor;
+      case kOpCeil         : return (void*)(Arg1Func)ceil;
+      case kOpRoundEven    : return (void*)(Arg1Func)rint;
+      case kOpRoundHalfAway: return (void*)(Arg1Func)mp_round_half_away;
+      case kOpRoundHalfUp  : return (void*)(Arg1Func)mp_round_half_up;
 
-      case kOpAbs      : return (void*)(Arg1Func)fabs;
-      case kOpExp      : return (void*)(Arg1Func)exp;
-      case kOpLog      : return (void*)(Arg1Func)log;
-      case kOpLog2     : return (void*)(Arg1Func)log2;
-      case kOpLog10    : return (void*)(Arg1Func)log10;
-      case kOpSqrt     : return (void*)(Arg1Func)sqrt;
-      case kOpFrac     : return (void*)(Arg1Func)mp_frac;
-      case kOpRecip    : return (void*)(Arg1Func)mp_recip;
+      case kOpAbs          : return (void*)(Arg1Func)fabs;
+      case kOpExp          : return (void*)(Arg1Func)exp;
+      case kOpLog          : return (void*)(Arg1Func)log;
+      case kOpLog2         : return (void*)(Arg1Func)log2;
+      case kOpLog10        : return (void*)(Arg1Func)log10;
+      case kOpSqrt         : return (void*)(Arg1Func)sqrt;
+      case kOpFrac         : return (void*)(Arg1Func)mp_frac;
+      case kOpRecip        : return (void*)(Arg1Func)mp_recip;
 
-      case kOpSin      : return (void*)(Arg1Func)sin;
-      case kOpCos      : return (void*)(Arg1Func)cos;
-      case kOpTan      : return (void*)(Arg1Func)tan;
-      case kOpSinh     : return (void*)(Arg1Func)sinh;
-      case kOpCosh     : return (void*)(Arg1Func)cosh;
-      case kOpTanh     : return (void*)(Arg1Func)tanh;
-      case kOpAsin     : return (void*)(Arg1Func)asin;
-      case kOpAcos     : return (void*)(Arg1Func)acos;
-      case kOpAtan     : return (void*)(Arg1Func)atan;
+      case kOpSin          : return (void*)(Arg1Func)sin;
+      case kOpCos          : return (void*)(Arg1Func)cos;
+      case kOpTan          : return (void*)(Arg1Func)tan;
+      case kOpSinh         : return (void*)(Arg1Func)sinh;
+      case kOpCosh         : return (void*)(Arg1Func)cosh;
+      case kOpTanh         : return (void*)(Arg1Func)tanh;
+      case kOpAsin         : return (void*)(Arg1Func)asin;
+      case kOpAcos         : return (void*)(Arg1Func)acos;
+      case kOpAtan         : return (void*)(Arg1Func)atan;
 
-      case kOpAvg      : return (void*)(Arg2Func)mp_avg;
-      case kOpMin      : return (void*)(Arg2Func)mp_min<double>;
-      case kOpMax      : return (void*)(Arg2Func)mp_max<double>;
-      case kOpPow      : return (void*)(Arg2Func)pow;
-      case kOpAtan2    : return (void*)(Arg2Func)atan2;
-      case kOpHypot    : return (void*)(Arg2Func)hypot;
-      case kOpCopySign : return (void*)(Arg2Func)mp_copy_sign;
+      case kOpAvg          : return (void*)(Arg2Func)mp_avg;
+      case kOpMin          : return (void*)(Arg2Func)mp_min<double>;
+      case kOpMax          : return (void*)(Arg2Func)mp_max<double>;
+      case kOpPow          : return (void*)(Arg2Func)pow;
+      case kOpAtan2        : return (void*)(Arg2Func)atan2;
+      case kOpHypot        : return (void*)(Arg2Func)hypot;
+      case kOpCopySign     : return (void*)(Arg2Func)mp_copy_sign;
 
       default:
         MATHPRESSO_ASSERT_NOT_REACHED();
@@ -108,11 +126,11 @@ struct MATHPRESSO_NOAPI JitVar {
 
   inline bool is_none() const noexcept { return _op.is_none(); }
   inline bool is_mem() const noexcept { return _op.is_mem(); }
-  inline bool is_vec() const noexcept { return _op.is_reg(RegType::kVec128); }
+  inline bool is_vec() const noexcept { return _op.is_vec(); }
 
   inline const Operand& op() const noexcept { return _op; }
-  inline const x86::Mem& mem() const noexcept { return _op.as<x86::Mem>(); }
-  inline const x86::Vec& vec() const noexcept { return _op.as<x86::Vec>(); }
+  inline const ujit::Mem& mem() const noexcept { return _op.as<ujit::Mem>(); }
+  inline const ujit::Vec& vec() const noexcept { return _op.as<ujit::Vec>(); }
 
   inline uint32_t flags() const noexcept { return _flags; }
   inline bool isRO() const noexcept { return (_flags & FLAG_RO) != 0; }
@@ -129,19 +147,16 @@ struct MATHPRESSO_NOAPI JitVar {
 
 struct MATHPRESSO_NOAPI JitCompiler {
   Arena& arena;
-  x86::Compiler* cc = nullptr;
+  ujit::UniCompiler uc;
 
-  x86::Gp var_ptr;
-  x86::Gp const_ptr;
-  x86::Gp result_ptr;
+  ujit::Gp var_ptr;
+  ujit::Gp result_ptr;
 
   JitVar* var_slots = nullptr;
   BaseNode* func_body = nullptr;
   ConstPoolNode* const_pool = nullptr;
 
-  bool enable_sse4_1 = false;
-
-  JitCompiler(Arena& arena, x86::Compiler* c);
+  JitCompiler(Arena& arena, ujit::BackendCompiler& cc, const CpuFeatures& cpu_features, CpuHints cpu_hints);
   ~JitCompiler();
 
   // Function Generator.
@@ -166,51 +181,58 @@ struct MATHPRESSO_NOAPI JitCompiler {
   JitVar on_invoke(AstCall* node);
 
   // Helpers.
-  void inline_round(const x86::Vec& dst, const x86::Vec& src, uint32_t op);
-  void inline_invoke(const x86::Vec& dst, const x86::Vec* args, uint32_t count, void* fn);
+  void inline_invoke(const ujit::Vec& dst, const ujit::Vec* args, uint32_t count, void* fn);
 
   // Constants.
   void prepare_const_pool();
   JitVar get_constant_u64(uint64_t value);
-  JitVar get_constant_u64_as_2xf64(uint64_t value);
+  JitVar get_constant_u64_as_f64x2(uint64_t value);
   JitVar get_constant_u64_aligned(uint64_t value);
   JitVar get_constant_f64(double value);
-  JitVar get_constant_f64_as_2xf64(double value);
+  JitVar get_constant_f64_as_f64x2(double value);
   JitVar get_constant_f64_aligned(double value);
 };
 
-JitCompiler::JitCompiler(Arena& arena, x86::Compiler* cc)
+JitCompiler::JitCompiler(Arena& arena, ujit::BackendCompiler& cc, const CpuFeatures& cpu_features, CpuHints cpu_hints)
   : arena(arena),
-    cc(cc),
+    uc(&cc, cpu_features, cpu_hints),
     var_slots(nullptr),
-    func_body(nullptr) {
-  const CpuFeatures::X86& features = CpuInfo::host().features().x86();
-  enable_sse4_1 = features.has_sse4_1();
-}
+    func_body(nullptr) {}
 
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::begin_function() {
-  FuncNode* func_node = cc->add_func(FuncSignature::build<void, double*, double*>(CallConvId::kCDecl));
+  FuncNode* func_node = uc.cc->new_func(FuncSignature::build<void, double*, double*>(CallConvId::kCDecl));
+  uc.init_function(func_node);
 
-  var_ptr = cc->new_gpz("var_ptr");
-  const_ptr = cc->new_gpz("const_ptr");
-  result_ptr = cc->new_gpz("result_ptr");
+  var_ptr = uc.new_gpz("var_ptr");
+  result_ptr = uc.new_gpz("result_ptr");
 
   func_node->set_arg(0, result_ptr);
   func_node->set_arg(1, var_ptr);
-  func_body = cc->cursor();
+  func_body = uc.cc->cursor();
 }
 
 void JitCompiler::end_function() {
-  cc->end_func();
-  if (const_pool)
-    cc->add_node(const_pool);
+  uc.cc->end_func();
+  if (const_pool) {
+    uc.cc->add_node(const_pool);
+  }
 }
 
 JitVar JitCompiler::copy_var(const JitVar& other, uint32_t flags) {
-  JitVar v(cc->new_xmm_sd(), flags);
-  cc->emit(other.is_vec() ? x86::Inst::kIdMovapd : x86::Inst::kIdMovsd, v.vec(), other.op());
+  JitVar v(uc.new_vec128_f64x1(), flags);
+
+  if (other.is_vec()) {
+    uc.v_mov(v.vec(), other.vec());
+  }
+  else if (other.is_mem()) {
+    uc.v_loadu64_f64(v.vec(), other.mem());
+  }
+  else {
+    MATHPRESSO_ASSERT_NOT_REACHED();
+  }
+
   return v;
 }
 
@@ -250,7 +272,7 @@ void JitCompiler::compile(AstBlock* node, AstScope* root_scope, uint32_t num_slo
       AstSymbol* sym = it.get();
       if (sym->is_global() && sym->is_altered()) {
         JitVar v = var_slots[sym->var_slot_id()];
-        cc->emit(x86::Inst::kIdMovsd, x86::ptr(var_ptr, sym->var_offset()), register_var(v).vec());
+        uc.v_storeu64_f64(ujit::mem_ptr(var_ptr, sym->var_offset()), register_var(v).vec());
       }
 
       it.next();
@@ -258,12 +280,12 @@ void JitCompiler::compile(AstBlock* node, AstScope* root_scope, uint32_t num_slo
   }
 
   // Return NaN if no result is given.
-  x86::Vec var;
+  ujit::Vec var;
   if (result.is_none())
     var = register_var(get_constant_f64(mp_get_nan())).vec();
   else
     var = register_var(result).vec();
-  cc->movsd(x86::ptr(result_ptr), var);
+  uc.v_storeu64_f64(ujit::mem_ptr(result_ptr), var);
 
   if (num_slots != 0) {
     arena.free_reusable(var_slots, sizeof(JitVar) * num_slots);
@@ -290,8 +312,9 @@ JitVar JitCompiler::on_block(AstBlock* node) {
   JitVar result;
   uint32_t i, size = node->size();
 
-  for (i = 0; i < size; i++)
+  for (i = 0; i < size; i++) {
     result = on_node(node->child_at(i));
+  }
 
   // Return the last result (or no result if the block is empty).
   return result;
@@ -319,10 +342,11 @@ JitVar JitCompiler::on_var(AstVar* node) {
   JitVar result = var_slots[slot_id];
   if (result.is_none()) {
     if (sym->is_global()) {
-      result = JitVar(x86::ptr(var_ptr, sym->var_offset()), JitVar::FLAG_RO);
+      result = JitVar(ujit::mem_ptr(var_ptr, sym->var_offset()), JitVar::FLAG_RO);
       var_slots[slot_id] = result;
-      if (sym->write_count() > 0)
+      if (sym->write_count() > 0) {
         result = copy_var(result, JitVar::FLAG_NONE);
+      }
     }
     else {
       result = get_constant_f64(mp_get_nan());
@@ -339,129 +363,80 @@ JitVar JitCompiler::on_imm(AstImm* node) {
 
 JitVar JitCompiler::on_unary_op(AstUnaryOp* node) {
   uint32_t op = node->op_type();
+
   JitVar var = on_node(node->child());
+  ujit::Vec result = uc.new_vec128_f64x1();
 
   switch (op) {
     case kOpNone:
       return var;
 
-    case kOpNeg: {
-      x86::Vec result = cc->new_xmm_sd();
-      cc->emit(x86::Inst::kIdXorpd, result, result);
-      cc->emit(x86::Inst::kIdSubsd, result, var.op());
-      return JitVar(result, JitVar::FLAG_NONE);
-    }
-
-    case kOpNot: {
-      var = writable_var(var);
-      cc->cmpsd(var.vec(), get_constant_f64_as_2xf64(0.0).mem(), x86::CmpImm::kEQ);
-      cc->andpd(var.vec(), get_constant_f64_as_2xf64(1.0).mem());
-      return var;
-    }
+    case kOpNeg: uc.s_neg_f64(result, var.op()); break;
+    case kOpNot: uc.v_not_f64(result, register_var(var).op()); break;
 
     case kOpIsNan: {
-      var = writable_var(var);
-      cc->cmpsd(var.vec(), var.vec(), x86::CmpImm::kEQ);
-      cc->andnpd(var.vec(), get_constant_f64_as_2xf64(1.0).mem());
-      return var;
+      var = register_var(var);
+      uc.s_cmp_eq_f64(result, var.vec(), var.vec());
+      uc.v_andn_f64(result, result, get_constant_f64_as_f64x2(1.0).op());
+      break;
     }
 
     case kOpIsInf: {
-      var = writable_var(var);
-      cc->orpd(var.vec(), get_constant_u64_as_2xf64(0x8000000000000000u).mem());
-      cc->cmpsd(var.vec(), get_constant_u64(0xFFF0000000000000u).mem(), x86::CmpImm::kEQ);
-      cc->andpd(var.vec(), get_constant_f64_as_2xf64(1.0).mem());
-      return var;
+      var = register_var(var);
+      uc.v_or_f64(result, var.vec(), get_constant_u64_as_f64x2(0x8000000000000000u).op());
+      uc.s_cmp_eq_f64(result, result, get_constant_f64(0xFFF0000000000000u).op());
+      uc.v_and_f64(result, result, get_constant_f64_as_f64x2(1.0).op());
+      break;
     }
 
     case kOpIsFinite: {
-      var = writable_var(var);
-      cc->orpd(var.vec(), get_constant_u64_as_2xf64(0x8000000000000000u).mem());
-      cc->cmpsd(var.vec(), get_constant_f64(0.0).mem(), x86::CmpImm::kLE);
-      cc->andpd(var.vec(), get_constant_f64_as_2xf64(1.0).mem());
-      return var;
+      var = register_var(var);
+      uc.v_or_f64(result, var.vec(), get_constant_u64_as_f64x2(0x8000000000000000u).op());
+      uc.s_cmp_le_f64(result, result, get_constant_f64(0.0).op());
+      uc.v_and_f64(result, result, get_constant_f64_as_f64x2(1.0).op());
+      break;
     }
 
     case kOpSignBit: {
-      x86::Vec result = cc->new_xmm_sd();
-      cc->pshufd(result, register_var(var).vec(), x86::shuffle_imm(3, 2, 1, 1));
-      cc->psrad(result, 31);
-      cc->andpd(result, get_constant_f64_as_2xf64(1.0).mem());
-      return JitVar(result, JitVar::FLAG_NONE);
-    }
-
-    case kOpRound:
-    case kOpRoundEven:
-    case kOpTrunc:
-    case kOpFloor:
-    case kOpCeil: {
-      var = writable_var(var);
-      inline_round(var.vec(), var.vec(), op);
-      return var;
-    }
-
-    case kOpAbs: {
-      x86::Vec result = cc->new_xmm_sd();
-      cc->emit(x86::Inst::kIdXorpd, result, result);
-      cc->emit(x86::Inst::kIdSubsd, result, var.op());
-      cc->emit(x86::Inst::kIdMaxsd, result, var.op());
-      return JitVar(result, JitVar::FLAG_NONE);
-    }
-
-    case kOpExp:
-    case kOpLog:
-    case kOpLog2:
-    case kOpLog10:
+      uc.v_srai_i64(result, var.op(), 63);
+      uc.v_and_f64(result, result, get_constant_f64_as_f64x2(1.0).op());
       break;
-
-    case kOpSqrt: {
-      x86::Vec result = cc->new_xmm_sd();
-      cc->emit(x86::Inst::kIdSqrtsd, result, var.op());
-      return JitVar(result, JitVar::FLAG_NONE);
     }
+
+    case kOpTrunc        : uc.s_trunc_f64(result, var.op()); break;
+    case kOpFloor        : uc.s_floor_f64(result, var.op()); break;
+    case kOpCeil         : uc.s_ceil_f64(result, var.op()); break;
+    case kOpRoundEven    : uc.s_round_even_f64(result, var.op()); break;
+    case kOpRoundHalfAway: uc.s_round_half_away_f64(result, var.op()); break;
+    case kOpRoundHalfUp  : uc.s_round_half_up_f64(result, var.op()); break;
+
+    case kOpAbs: uc.s_abs_f64(result, var.op()); break;
+    case kOpSqrt: uc.s_sqrt_f64(result, var.op()); break;
 
     case kOpFrac: {
-      var = writable_var(var);
-      x86::Vec tmp = cc->new_xmm_sd();
+      ujit::Vec tmp = uc.new_vec128_f64x1();
+      var = register_var(var);
 
-      if (enable_sse4_1) {
-        cc->emit(x86::Inst::kIdRoundsd, tmp, var.op(), x86::RoundImm::kDown | x86::RoundImm::kSuppress);
-        cc->emit(x86::Inst::kIdSubsd, var.op(), tmp);
-        return var;
-      }
-      else {
-        // Pure SSE2 `frac()`, uses the same rounding trick as `floor()`.
-        inline_round(tmp, var.vec(), kOpFloor);
-        cc->subsd(var.vec(), tmp);
-        return var;
-      }
+      uc.s_floor_f64(tmp, var.vec());
+      uc.s_sub_f64(result, var.vec(), tmp);
+      break;
     }
 
     case kOpRecip: {
-      x86::Vec result = cc->new_xmm_sd();
-      cc->emit(x86::Inst::kIdMovsd, result, get_constant_f64(1.0).op());
-      cc->emit(x86::Inst::kIdDivsd, result, var.op());
-      return JitVar(result, JitVar::FLAG_NONE);
+      uc.v_loada64_f64(result, get_constant_f64(1.0).mem());
+      uc.s_div_f64(result, result, var.op());
+      break;
     }
 
-    case kOpSin:
-    case kOpCos:
-    case kOpTan:
-    case kOpSinh:
-    case kOpCosh:
-    case kOpTanh:
-    case kOpAsin:
-    case kOpAcos:
-    case kOpAtan:
+    default: {
+      // No inline implementation -> function call.
+      ujit::Vec args[1] = { register_var(var).vec() };
+      inline_invoke(result, args, 1, JitUtils::func_by_op(op));
       break;
+    }
   }
 
-  // No inline implementation -> function call.
-  x86::Vec result = cc->new_xmm_sd();
-  x86::Vec args[1] = { register_var(var).vec() };
-  inline_invoke(result, args, 1, JitUtils::func_by_op(op));
-
-  return JitVar(result, JitVar::FLAG_NONE);
+  return JitVar(result, JitVar::FLAG_NONE);;
 }
 
 JitVar JitCompiler::on_binary_op(AstBinaryOp* node) {
@@ -500,87 +475,65 @@ JitVar JitCompiler::on_binary_op(AstBinaryOp* node) {
 
     // Commutativity.
     if (op == kOpAdd || op == kOpMul || op == kOpAvg || op == kOpMin || op == kOpMax) {
-      if (vl.isRO() && !vr.isRO())
+      if (vl.isRO() && !vr.isRO()) {
         vl.swap_with(vr);
+      }
     }
 
     vl = writable_var(vl);
   }
 
-  uint32_t inst = 0;
-  x86::CmpImm cmp_imm {};
+  ujit::Vec result = uc.new_vec128_f64x1();
 
   switch (op) {
-    case kOpEq: cmp_imm = x86::CmpImm::kEQ ; goto emit_compare;
-    case kOpNe: cmp_imm = x86::CmpImm::kNEQ; goto emit_compare;
-    case kOpGt: cmp_imm = x86::CmpImm::kNLE; goto emit_compare;
-    case kOpGe: cmp_imm = x86::CmpImm::kNLT; goto emit_compare;
-    case kOpLt: cmp_imm = x86::CmpImm::kLT ; goto emit_compare;
-    case kOpLe: cmp_imm = x86::CmpImm::kLE ; goto emit_compare;
-emit_compare: {
-      vl = writable_var(vl);
-      cc->emit(x86::Inst::kIdCmpsd, vl.vec(), vr.op(), cmp_imm);
-      cc->emit(x86::Inst::kIdAndpd, vl.vec(), get_constant_f64_as_2xf64(1.0).op());
-      return vl;
-    }
+    case kOpEq: uc.s_cmp_eq_f64(result, register_var(vl).vec(), vr.op()); uc.v_and_f64(result, result, uc.simd_const(&uc.ct().f64_1, ujit::Bcst::k64, result)); break;
+    case kOpNe: uc.s_cmp_ne_f64(result, register_var(vl).vec(), vr.op()); uc.v_and_f64(result, result, uc.simd_const(&uc.ct().f64_1, ujit::Bcst::k64, result)); break;
+    case kOpGt: uc.s_cmp_gt_f64(result, register_var(vl).vec(), vr.op()); uc.v_and_f64(result, result, uc.simd_const(&uc.ct().f64_1, ujit::Bcst::k64, result)); break;
+    case kOpGe: uc.s_cmp_ge_f64(result, register_var(vl).vec(), vr.op()); uc.v_and_f64(result, result, uc.simd_const(&uc.ct().f64_1, ujit::Bcst::k64, result)); break;
+    case kOpLt: uc.s_cmp_lt_f64(result, register_var(vl).vec(), vr.op()); uc.v_and_f64(result, result, uc.simd_const(&uc.ct().f64_1, ujit::Bcst::k64, result)); break;
+    case kOpLe: uc.s_cmp_le_f64(result, register_var(vl).vec(), vr.op()); uc.v_and_f64(result, result, uc.simd_const(&uc.ct().f64_1, ujit::Bcst::k64, result)); break;
 
-    case kOpAdd: inst = x86::Inst::kIdAddsd; goto emit_inst;
-    case kOpSub: inst = x86::Inst::kIdSubsd; goto emit_inst;
-    case kOpMul: inst = x86::Inst::kIdMulsd; goto emit_inst;
-    case kOpDiv: inst = x86::Inst::kIdDivsd; goto emit_inst;
-    case kOpMin: inst = x86::Inst::kIdMinsd; goto emit_inst;
-    case kOpMax: inst = x86::Inst::kIdMaxsd; goto emit_inst;
-emit_inst: {
-      cc->emit(inst, vl.op(), vr.op()); return vl;
+    case kOpAdd: uc.s_add_f64(result, register_var(vl).vec(), vr.op()); break;
+    case kOpSub: uc.s_sub_f64(result, register_var(vl).vec(), vr.op()); break;
+    case kOpMul: uc.s_mul_f64(result, register_var(vl).vec(), vr.op()); break;
+    case kOpDiv: uc.s_div_f64(result, register_var(vl).vec(), vr.op()); break;
+
+    case kOpMod: {
+      vl = register_var(vl);
+      vr = register_var(vr);
+      uc.s_mod_f64(result, vl.vec(), vr.vec());
+      break;
     }
 
     case kOpAvg: {
-      vl = writable_var(vl);
-      cc->emit(x86::Inst::kIdAddsd, vl.vec(), vr.op());
-      cc->emit(x86::Inst::kIdMulsd, vl.vec(), get_constant_f64(0.5).op());
-      return vl;
+      uc.s_add_f64(result, register_var(vl).vec(), vr.op());
+      uc.s_mul_f64(result, result, get_constant_f64(0.5).op());
+      break;
     }
 
-    case kOpMod: {
-      x86::Vec result = cc->new_xmm_sd();
+    case kOpMin: uc.s_min_f64(result, register_var(vl).vec(), vr.op()); break;
+    case kOpMax: uc.s_max_f64(result, register_var(vl).vec(), vr.op()); break;
 
+    case kOpCopySign: {
+      ujit::Vec tmp = uc.new_vec128_f64x1();
       vl = writable_var(vl);
-      vr = register_var(vr);
+      vr = writable_var(vr);
 
-      cc->movapd(result, vl.vec());
-      cc->divsd(vl.vec(), vr.vec());
-      inline_round(vl.vec(), vl.vec(), kOpTrunc);
-      cc->mulsd(vl.vec(), vr.vec());
-      cc->subsd(result, vl.vec());
+      uc.v_and_f64(result, vl.vec(), get_constant_u64_as_f64x2(0x7FFFFFFFFFFFFFFFu).mem());
+      uc.v_and_f64(tmp, vr.vec(), get_constant_u64_as_f64x2(0x8000000000000000u).mem());
+      uc.v_or_f64(result, result, tmp);
 
       return JitVar(result, JitVar::FLAG_NONE);
     }
 
-    case kOpPow:
-    case kOpAtan2:
-    case kOpHypot:
-      break;
+    default: {
+      // No inline implementation -> function call.
+      ujit::Vec args[2] = { register_var(vl).vec(), register_var(vr).vec() };
+      inline_invoke(result, args, 2, JitUtils::func_by_op(op));
 
-    case kOpCopySign: {
-      vl = writable_var(vl);
-      vr = writable_var(vr);
-
-      cc->andpd(vl.vec(), get_constant_u64_as_2xf64(0x7FFFFFFFFFFFFFFFu).mem());
-      cc->andpd(vr.vec(), get_constant_u64_as_2xf64(0x8000000000000000u).mem());
-      cc->orpd(vl.vec(), vr.vec());
-
-      return vl;
+      return JitVar(result, JitVar::FLAG_NONE);
     }
-
-    default:
-      MATHPRESSO_ASSERT_NOT_REACHED();
-      return vl;
   }
-
-  // No inline implementation -> function call.
-  x86::Vec result = cc->new_xmm_sd();
-  x86::Vec args[2] = { register_var(vl).vec(), register_var(vr).vec() };
-  inline_invoke(result, args, 2, JitUtils::func_by_op(op));
 
   return JitVar(result, JitVar::FLAG_NONE);
 }
@@ -589,217 +542,49 @@ JitVar JitCompiler::on_invoke(AstCall* node) {
   uint32_t i, size = node->size();
   AstSymbol* sym = node->symbol();
 
-  x86::Vec result = cc->new_xmm_sd();
-  x86::Vec args[8];
+  ujit::Vec result = uc.new_vec128_f64x1();
+  ujit::Vec args[8];
+  MATHPRESSO_ASSERT(size <= 8);
 
-  for (i = 0; i < size; i++)
+  for (i = 0; i < size; i++) {
     args[i] = register_var(on_node(node->child_at(i))).vec();
+  }
 
   inline_invoke(result, args, size, sym->func_ptr());
   return JitVar(result, JitVar::FLAG_NONE);
 }
 
-void JitCompiler::inline_round(const x86::Vec& dst, const x86::Vec& src, uint32_t op) {
-  // SSE4.1 implementation is easy except `round()`, which is not `roundeven()`.
-  if (enable_sse4_1) {
-    if (op == kOpRound) {
-      x86::Vec tmp = cc->new_xmm_sd();
-      cc->roundsd(tmp, src, x86::RoundImm::kDown | x86::RoundImm::kSuppress);
-
-      if (dst.id() != src.id())
-        cc->movapd(dst, src);
-
-      cc->subsd(dst, tmp);
-      cc->cmpsd(dst, get_constant_f64(0.5).mem(), x86::CmpImm::kNLT);
-      cc->andpd(dst, get_constant_f64_as_2xf64(1.0).mem());
-      cc->addpd(dst, tmp);
-    }
-    else {
-      x86::RoundImm round_imm {};
-
-      switch (op) {
-        case kOpRoundEven: round_imm = x86::RoundImm::kNearest; break;
-        case kOpTrunc    : round_imm = x86::RoundImm::kTrunc  ; break;
-        case kOpFloor    : round_imm = x86::RoundImm::kDown   ; break;
-        case kOpCeil     : round_imm = x86::RoundImm::kUp     ; break;
-        default:
-          MATHPRESSO_ASSERT_NOT_REACHED();
-      }
-      cc->roundsd(dst, src, round_imm | x86::RoundImm::kSuppress);
-    }
-    return;
-  }
-
-  // Pure SSE2 requires the following rounding trick:
-  //   double roundeven(double x) {
-  //     double maxn   = pow(2, 52);
-  //     double magic0 = pow(2, 52) + pow(2, 51);
-  //     return x >= maxn ? x : x + magic0 - magic0;
-  //   }
-  const double maxn = 4503599627370496.0;
-  const double magic0 = 6755399441055744.0;
-  const double magic1 = 6755399441055745.0;
-
-  if (op == kOpRoundEven) {
-    x86::Vec tmp = cc->new_xmm_sd();
-
-    cc->movapd(tmp, src);
-    cc->cmpsd(tmp, get_constant_f64(maxn).mem(), x86::CmpImm::kLT);
-    cc->andpd(tmp, get_constant_f64_aligned(magic0).mem());
-
-    if (dst.id() != src.id())
-      cc->movapd(dst, src);
-
-    cc->addsd(dst, tmp);
-    cc->subsd(dst, tmp);
-
-    return;
-  }
-
-  // The `roundeven()` function can be used to implement efficiently the
-  // remaining rounding functions. The easiest are `floor()` and `ceil()`.
-  if (op == kOpRound || op == kOpFloor || op == kOpCeil) {
-    x86::Vec t1 = cc->new_xmm_sd();
-    x86::Vec t2 = cc->new_xmm_sd();
-    x86::Vec t3 = cc->new_xmm_sd();
-
-    cc->movapd(t2, src);
-    cc->movapd(t3, src);
-
-    if (dst.id() != src.id())
-      cc->movapd(dst, src);
-
-    switch (op) {
-      case kOpRound:
-        cc->addsd(t2, get_constant_f64(magic0).mem());
-        cc->addsd(t3, get_constant_f64(magic1).mem());
-
-        cc->movapd(t1, src);
-        cc->subsd(t2, get_constant_f64(magic0).mem());
-        cc->subsd(t3, get_constant_f64(magic1).mem());
-
-        cc->cmpsd(t1, get_constant_f64(maxn).mem(), x86::CmpImm::kNLT);
-        cc->maxsd(t2, t3);
-
-        cc->andpd(dst, t1);
-        break;
-
-      case kOpFloor:
-        cc->addsd(t2, get_constant_f64(magic0).mem());
-        cc->movapd(t1, src);
-
-        cc->subsd(t2, get_constant_f64(magic0).mem());
-        cc->cmpsd(t1, get_constant_f64(maxn).mem(), x86::CmpImm::kNLT);
-
-        cc->cmpsd(t3, t2, x86::CmpImm::kLT);
-        cc->andpd(t3, get_constant_f64_as_2xf64(1.0).mem());
-
-        cc->andpd(dst, t1);
-        cc->subpd(t2, t3);
-        break;
-
-      case kOpCeil:
-        cc->addsd(t2, get_constant_f64(magic0).mem());
-        cc->movapd(t1, src);
-
-        cc->subsd(t2, get_constant_f64(magic0).mem());
-        cc->cmpsd(t1, get_constant_f64(maxn).mem(), x86::CmpImm::kNLT);
-
-        cc->cmpsd(t3, t2, x86::CmpImm::kNLE);
-        cc->andpd(t3, get_constant_f64_as_2xf64(1.0).mem());
-
-        cc->andpd(dst, t1);
-        cc->addpd(t2, t3);
-        break;
-    }
-
-    cc->andnpd(t1, t2);
-    cc->orpd(dst, t1);
-
-    return;
-  }
-
-  if (op == kOpTrunc) {
-    if (cc->is_64bit()) {
-      // In 64-bit mode we can just do a roundtrip with CVTTSD2SI and CVTSI2SD
-      // and use such value if the floating point was not already an integer.
-      x86::Gp r = cc->new_gp64();
-      x86::Vec t = cc->new_xmm_sd();
-      x86::Vec d = dst.id() == src.id() ? cc->new_xmm_sd() : dst;
-
-      cc->cvttsd2si(r, src);
-      cc->movsd(t, get_constant_u64(0x7FFFFFFFFFFFFFFFu).mem());
-      cc->andpd(t, src);
-
-      cc->cvtsi2sd(d, r);
-      cc->cmpsd(t, get_constant_f64(maxn).mem(), x86::CmpImm::kLT);
-      cc->andpd(d, t);
-      cc->andnpd(t, src);
-      cc->orpd(d, t);
-
-      if (dst.id() != d.id())
-        cc->movapd(dst, d);
-    }
-    else {
-      x86::Vec t1 = cc->new_xmm_sd();
-      x86::Vec t2 = cc->new_xmm_sd();
-      x86::Vec t3 = cc->new_xmm_sd();
-
-      cc->movsd(t2, get_constant_u64(0x7FFFFFFFFFFFFFFFu).mem());
-      cc->andpd(t2, src);
-
-      if (dst.id() != src.id())
-        cc->movapd(dst, src);
-
-      cc->movapd(t1, t2);
-      cc->addsd(t2, get_constant_f64(magic0).mem());
-      cc->movapd(t3, t1);
-
-      cc->subsd(t2, get_constant_f64(magic0).mem());
-      cc->cmpsd(t1, get_constant_f64(maxn).mem(), x86::CmpImm::kNLT);
-
-      cc->cmpsd(t3, t2, x86::CmpImm::kLT);
-      cc->orpd(t1, get_constant_u64_as_2xf64(0x8000000000000000u).mem());
-      cc->andpd(t3, get_constant_f64_as_2xf64(1.0).mem());
-
-      cc->andpd(dst, t1);
-      cc->subpd(t2, t3);
-
-      cc->andnpd(t1, t2);
-      cc->orpd(dst, t1);
-    }
-    return;
-  }
-
-  inline_invoke(dst, &src, 1, (void*)(Arg1Func)mp_round);
-}
-
-void JitCompiler::inline_invoke(const x86::Vec& dst, const x86::Vec* args, uint32_t count, void* fn) {
+void JitCompiler::inline_invoke(const ujit::Vec& dst, const ujit::Vec* args, uint32_t count, void* fn) {
   uint32_t i;
 
   // Use function builder to build a function prototype.
   FuncSignature signature;
   signature.set_ret_t<double>();
 
-  for (i = 0; i < count; i++)
+  for (i = 0; i < count; i++) {
     signature.add_arg_t<double>();
+  }
 
   // Create the function call.
   InvokeNode* invoke_node;
-  cc->invoke(asmjit::Out(invoke_node), (uint64_t)fn, signature);
+
+#if defined(ASMJIT_UJIT_AARCH64)
+  ujit::Gp func_ptr = uc.new_gp_ptr("func_ptr");
+  uc.mov(func_ptr, (uint64_t)fn);
+  uc.cc->invoke(asmjit::Out(invoke_node), func_ptr, signature);
+#else
+  uc.cc->invoke(asmjit::Out(invoke_node), (uint64_t)fn, signature);
+#endif
   invoke_node->set_ret(0, dst);
 
-  for (i = 0; i < count; i++)
-    invoke_node->set_arg(static_cast<uint32_t>(i), args[i]);
+  for (i = 0; i < count; i++) {
+    invoke_node->set_arg(i, args[i]);
+  }
 }
 
 void JitCompiler::prepare_const_pool() {
   if (!const_pool) {
-    cc->new_const_pool_node(asmjit::Out(const_pool));
-
-    BaseNode* prev = cc->set_cursor(func_body);
-    cc->lea(const_ptr, x86::ptr(const_pool->label()));
-    if (prev != func_body) cc->set_cursor(prev);
+    uc.cc->new_const_pool_node(asmjit::Out(const_pool));
   }
 }
 
@@ -810,10 +595,10 @@ JitVar JitCompiler::get_constant_u64(uint64_t value) {
   if (const_pool->add(&value, sizeof(uint64_t), asmjit::Out(offset)) != asmjit::Error::kOk)
     return JitVar();
 
-  return JitVar(x86::ptr(const_ptr, static_cast<int>(offset)), JitVar::FLAG_NONE);
+  return JitVar(ujit::mem_ptr(const_pool->label(), static_cast<int>(offset)), JitVar::FLAG_NONE);
 }
 
-JitVar JitCompiler::get_constant_u64_as_2xf64(uint64_t value) {
+JitVar JitCompiler::get_constant_u64_as_f64x2(uint64_t value) {
   prepare_const_pool();
 
   uint64_t data[2] = { value, 0 };
@@ -822,7 +607,7 @@ JitVar JitCompiler::get_constant_u64_as_2xf64(uint64_t value) {
   if (const_pool->add(data, sizeof(data), asmjit::Out(offset)) != asmjit::Error::kOk)
     return JitVar();
 
-  return JitVar(x86::ptr(const_ptr, static_cast<int>(offset)), JitVar::FLAG_NONE);
+  return JitVar(ujit::mem_ptr(const_pool->label(), static_cast<int>(offset)), JitVar::FLAG_NONE);
 }
 
 JitVar JitCompiler::get_constant_u64_aligned(uint64_t value) {
@@ -834,7 +619,7 @@ JitVar JitCompiler::get_constant_u64_aligned(uint64_t value) {
   if (const_pool->add(two, sizeof(uint64_t) * 2, asmjit::Out(offset)) != asmjit::Error::kOk)
     return JitVar();
 
-  return JitVar(x86::ptr(const_ptr, static_cast<int>(offset)), JitVar::FLAG_NONE);
+  return JitVar(ujit::mem_ptr(const_pool->label(), static_cast<int>(offset)), JitVar::FLAG_NONE);
 }
 
 JitVar JitCompiler::get_constant_f64(double value) {
@@ -843,10 +628,10 @@ JitVar JitCompiler::get_constant_f64(double value) {
   return get_constant_u64(bits.u);
 }
 
-JitVar JitCompiler::get_constant_f64_as_2xf64(double value) {
+JitVar JitCompiler::get_constant_f64_as_f64x2(double value) {
   DoubleBits bits;
   bits.d = value;
-  return get_constant_u64_as_2xf64(bits.u);
+  return get_constant_u64_as_f64x2(bits.u);
 }
 
 JitVar JitCompiler::get_constant_f64_aligned(double value) {
@@ -855,13 +640,33 @@ JitVar JitCompiler::get_constant_f64_aligned(double value) {
   return get_constant_u64_aligned(bits.u);
 }
 
-CompiledFunc compile_function(AstBuilder* ast, uint32_t options, OutputLog* log) {
+CompiledFunc compile_function(AstBuilder* ast, [[maybe_unused]] uint32_t options, OutputLog* log) {
   StringLogger logger;
+  CpuFeatures features = jit_global.runtime.cpu_features();
 
+#if defined(ASMJIT_UJIT_X86)
+  if ((options & (kOptionDisableAVX512 | kOptionDisableAVX | kOptionDisableSSE4_1)) != 0) {
+    features.x86().remove_avx512();
+  }
+
+  if ((options & (kOptionDisableAVX | kOptionDisableSSE4_1)) != 0) {
+    features.x86().remove_avx();
+  }
+
+  if ((options & kOptionDisableSSE4_1) != 0) {
+    features.remove(CpuFeatures::X86::kSSE4_1);
+    features.remove(CpuFeatures::X86::kSSE4_2);
+  }
+#endif
+
+  JitErrorHandler eh;
   CodeHolder code;
-  code.init((jit_global.runtime.environment()));
 
-  x86::Compiler c(&code);
+  code.init(jit_global.runtime.environment(), features);
+  code.set_error_handler(&eh);
+
+  ujit::BackendCompiler cc(&code);
+
   bool debug_machine_code = log != nullptr && (options & kOptionDebugMachineCode) != 0;
   bool debug_compiler     = log != nullptr && (options & kOptionDebugCompiler   ) != 0;
 
@@ -869,25 +674,30 @@ CompiledFunc compile_function(AstBuilder* ast, uint32_t options, OutputLog* log)
     logger.add_flags(FormatFlags::kMachineCode | FormatFlags::kRegCasts | FormatFlags::kExplainImms);
     code.set_logger(&logger);
 
-    if (debug_compiler)
-      c.add_diagnostic_options(DiagnosticOptions::kRAAnnotate | DiagnosticOptions::kRADebugAll);
+    if (debug_compiler) {
+      cc.add_diagnostic_options(DiagnosticOptions::kRAAnnotate | DiagnosticOptions::kRADebugAll);
+    }
   }
 
-  JitCompiler jit_compiler(ast->arena(), &c);
-  if ((options & kOptionDisableSSE4_1) != 0)
-    jit_compiler.enable_sse4_1 = false;
+  {
+    JitCompiler jit_compiler(ast->arena(), cc, features, CpuInfo::recalculate_hints(CpuInfo::host(), features));
+    jit_compiler.begin_function();
+    jit_compiler.compile(ast->program_node(), ast->root_scope(), ast->_num_slots);
+    jit_compiler.end_function();
+  }
 
-  jit_compiler.begin_function();
-  jit_compiler.compile(ast->program_node(), ast->root_scope(), ast->_num_slots);
-  jit_compiler.end_function();
-
-  c.finalize();
+  if (cc.finalize() != asmjit::Error::kOk) {
+    return nullptr;
+  }
 
   CompiledFunc fn;
-  jit_global.runtime.add(&fn, &code);
+  if (jit_global.runtime.add(&fn, &code) != asmjit::Error::kOk) {
+    return nullptr;
+  }
 
-  if (debug_machine_code || debug_compiler)
+  if (debug_machine_code || debug_compiler) {
     log->log(OutputLog::kMessageAsm, 0, 0, logger.data(), logger.data_size());
+  }
 
   return fn;
 }

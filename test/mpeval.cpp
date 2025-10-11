@@ -61,7 +61,7 @@ int main() {
     fgets(buffer, 4095, stdin);
     if (buffer[0] == 0) break;
 
-    mathpresso::Error result = e.compile(ctx, buffer, mathpresso::kOptionVerbose, &outputLog);
+    mathpresso::Error result = e.compile(ctx, buffer, mathpresso::kOptionVerbose | mathpresso::kOptionDebugMachineCode, &outputLog);
     if (result == mathpresso::kErrorOk)
       fprintf(stdout, "%f\n", e.evaluate(&variables));
     if (result == mathpresso::kErrorNoExpression)

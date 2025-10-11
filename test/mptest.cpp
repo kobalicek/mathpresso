@@ -14,23 +14,11 @@
 
 // Undef all macros that could collide with mathpresso language builtins (see tests).
 #if defined(min)
-# undef min
+  #undef min
 #endif
 
 #if defined(max)
-# undef max
-#endif
-
-#if defined(isnan)
-# undef isnan
-#endif
-
-#if defined(isinf)
-# undef isinf
-#endif
-
-#if defined(isfinite)
-# undef isfinite
+  #undef max
 #endif
 
 #if defined(__GNUC__)
@@ -42,20 +30,24 @@ static inline void set_x87_mode(unsigned short mode) {
 // Double Bits
 // ===========
 
-// This is a copy-pase from `mpeval_p.h`, we can't include it here since it's
-// private.
+//! DP-FP binary representation and utilities.
 union DoubleBits {
-  static MATHPRESSO_INLINE DoubleBits from_double(double d) { DoubleBits u; u.d = d; return u; }
+  static MATHPRESSO_INLINE DoubleBits from_double(double val) { DoubleBits u; u.d = val; return u; }
+  static MATHPRESSO_INLINE DoubleBits from_uint64(uint64_t val) { DoubleBits u; u.u = val; return u; }
 
-  MATHPRESSO_INLINE void set_nan() { hi = 0x7FF80000u; lo = 0x00000000u; }
-  MATHPRESSO_INLINE void set_inf() { hi = 0x7FF00000u; lo = 0x00000000u; }
+  MATHPRESSO_INLINE bool sign_bit() const { return bool(u >> 63); }
 
-  MATHPRESSO_INLINE bool is_nan() const { return (hi & 0x7FF00000u) == 0x7FF00000u && ((hi & 0x000FFFFFu) | lo) != 0x00000000u; }
-  MATHPRESSO_INLINE bool is_inf() const { return (hi & 0x7FFFFFFFu) == 0x7FF00000u && lo == 0x00000000u; }
-  MATHPRESSO_INLINE bool is_finite() const { return (hi & 0x7FF00000u) != 0x7FF00000u; }
+  MATHPRESSO_INLINE void set_nan() { u = 0x7FF8000000000000u; }
+  MATHPRESSO_INLINE void set_inf() { u = 0x7FF0000000000000u; }
 
+  MATHPRESSO_INLINE bool is_nan() const { return (u & 0x7FFFFFFFFFFFFFFFu) >  0x7FF0000000000000u; }
+  MATHPRESSO_INLINE bool is_inf() const { return (u & 0x7FFFFFFFFFFFFFFFu) == 0x7FF0000000000000u; }
+  MATHPRESSO_INLINE bool is_finite() const { return (u & 0x7FF0000000000000u) != 0x7FF0000000000000u; }
+
+  //! Value as uint64_t.
+  uint64_t u;
+  //! Value as `double`.
   double d;
-  struct { unsigned int lo, hi; };
 };
 
 // Test Option
@@ -91,6 +83,8 @@ struct TestOutputLog : public mathpresso::OutputLog {
       case kMessageAstFinal  : printf("[AST-Final]:\n%s", message); break;
       case kMessageAsm       : printf("[Machine-Code]:\n%s", message); break;
     }
+
+    fflush(stdout);
   }
 };
 
@@ -121,9 +115,12 @@ struct TestApp {
   double x, y, z, big;
 
   // Functions.
-  inline double isinf(double x) { return DoubleBits::from_double(x).is_inf() ? 1.0 : 0.0; }
-  inline double isnan(double x) { return DoubleBits::from_double(x).is_nan() ? 1.0 : 0.0; }
-  inline double isfinite(double x) { return DoubleBits::from_double(x).is_finite() ? 1.0 : 0.0; }
+  inline double is_inf(double x) { return DoubleBits::from_double(x).is_inf() ? 1.0 : 0.0; }
+  inline double is_nan(double x) { return DoubleBits::from_double(x).is_nan() ? 1.0 : 0.0; }
+  inline double is_finite(double x) { return DoubleBits::from_double(x).is_finite() ? 1.0 : 0.0; }
+
+  inline double sign_bit(double x) { return signbit(x); }
+  inline double copy_sign(double x, double y) { return copysign(x, y); }
 
   inline double avg(double x, double y) { return (x + y) * 0.5; }
   inline double min(double x, double y) { return x < y ? x : y; }
@@ -133,11 +130,9 @@ struct TestApp {
   inline double recip(double x) { return 1.0 / x; }
 
   inline double frac(double x) { return x - ::floor(x); }
-  inline double round(double x) {
-    double y = ::floor(x);
-    return y + (x - y >= 0.5 ? double(1.0) : double(0.0));
-  }
-  inline double roundeven(double x) { return ::rint(x); }
+  inline double round_even(double x) { return ::rint(x); }
+  inline double round_half_away(double x) { return ::trunc(x + copysign(0.49999999999999994, x)); }
+  inline double round_half_up(double x) { return ::floor(x + 0.49999999999999994); }
 
   // TestApp
   // -------
@@ -272,17 +267,17 @@ struct TestApp {
       TEST_INLINE(1.7976931348623157e+308),
       TEST_INLINE(2.2250738585072014e-308),
 
-      TEST_INLINE(isinf(x)),
-      TEST_INLINE(isnan(x)),
-      TEST_INLINE(isfinite(x)),
+      TEST_INLINE(is_inf(x)),
+      TEST_INLINE(is_nan(x)),
+      TEST_INLINE(is_finite(x)),
 
-      TEST_STRING("isinf(0.0 / 0.0)", isinf(std::numeric_limits<double>::quiet_NaN())),
-      TEST_STRING("isnan(0.0 / 0.0)", isnan(std::numeric_limits<double>::quiet_NaN())),
-      TEST_STRING("isfinite(0.0 / 0.0)", isfinite(std::numeric_limits<double>::quiet_NaN())),
+      TEST_STRING("is_inf(0.0 / 0.0)", is_inf(std::numeric_limits<double>::quiet_NaN())),
+      TEST_STRING("is_nan(0.0 / 0.0)", is_nan(std::numeric_limits<double>::quiet_NaN())),
+      TEST_STRING("is_finite(0.0 / 0.0)", is_finite(std::numeric_limits<double>::quiet_NaN())),
 
-      TEST_STRING("isinf(1.0 / 0.0)", isinf(std::numeric_limits<double>::infinity())),
-      TEST_STRING("isnan(1.0 / 0.0)", isnan(std::numeric_limits<double>::infinity())),
-      TEST_STRING("isfinite(1.0 / 0.0)", isfinite(std::numeric_limits<double>::infinity())),
+      TEST_STRING("is_inf(1.0 / 0.0)", is_inf(std::numeric_limits<double>::infinity())),
+      TEST_STRING("is_nan(1.0 / 0.0)", is_nan(std::numeric_limits<double>::infinity())),
+      TEST_STRING("is_finite(1.0 / 0.0)", is_finite(std::numeric_limits<double>::infinity())),
 
       TEST_INLINE(x + y),
       TEST_INLINE(x - y),
@@ -314,7 +309,8 @@ struct TestApp {
 
       TEST_STRING("-(x % y)", -(::fmod(x, y))),
 
-      #if 0 // Temporarily disabled as it hangs VS, I don't know why.
+// Temporarily disabled as it hangs MSVC compiler, I don't know why.
+#if !defined(_MSC_VER)
       TEST_INLINE(x * z + y * z),
       TEST_INLINE(x * z - y * z),
       TEST_INLINE(x * z * y * z),
@@ -330,7 +326,7 @@ struct TestApp {
       TEST_INLINE(x + y == y - z),
       TEST_INLINE(x * y == y * z),
       TEST_INLINE(x > y == y < z),
-      #endif
+#endif
 
       TEST_INLINE(-x),
       TEST_INLINE(-1.0 + x),
@@ -344,19 +340,26 @@ struct TestApp {
       TEST_INLINE(((((x*((((y-1.50)+1.82)-x)/PI))/x)*x)+z)),
       TEST_INLINE((((((((((x+1.35)+PI)/PI)-y)+z)-z)+y)/x)+0.81)),
 
-      TEST_INLINE(round(x)),
-      TEST_INLINE(round(y)),
-      TEST_INLINE(round(big)),
-      TEST_INLINE(round(-x)),
-      TEST_INLINE(round(-y)),
-      TEST_INLINE(round(-big)),
+      TEST_INLINE(round_even(x)),
+      TEST_INLINE(round_even(y)),
+      TEST_INLINE(round_even(big)),
+      TEST_INLINE(round_even(-x)),
+      TEST_INLINE(round_even(-y)),
+      TEST_INLINE(round_even(-big)),
 
-      TEST_INLINE(roundeven(x)),
-      TEST_INLINE(roundeven(y)),
-      TEST_INLINE(roundeven(big)),
-      TEST_INLINE(roundeven(-x)),
-      TEST_INLINE(roundeven(-y)),
-      TEST_INLINE(roundeven(-big)),
+      TEST_INLINE(round_half_away(x)),
+      TEST_INLINE(round_half_away(y)),
+      TEST_INLINE(round_half_away(big)),
+      TEST_INLINE(round_half_away(-x)),
+      TEST_INLINE(round_half_away(-y)),
+      TEST_INLINE(round_half_away(-big)),
+
+      TEST_INLINE(round_half_up(x)),
+      TEST_INLINE(round_half_up(y)),
+      TEST_INLINE(round_half_up(big)),
+      TEST_INLINE(round_half_up(-x)),
+      TEST_INLINE(round_half_up(-y)),
+      TEST_INLINE(round_half_up(-big)),
 
       TEST_INLINE(trunc(x)),
       TEST_INLINE(trunc(y)),
@@ -446,15 +449,21 @@ struct TestApp {
     #undef TEST_INLINE
 
     unsigned int defaultOptions = mathpresso::kNoOptions;
-    if (verbose)
+    if (verbose) {
       defaultOptions |= mathpresso::kOptionVerbose | mathpresso::kOptionDebugMachineCode;
+    }
 
-    if (debug_compiler)
+    if (debug_compiler) {
       defaultOptions |= mathpresso::kOptionVerbose | mathpresso::kOptionDebugCompiler;
+    }
 
     TestOption options[] = {
-      { "SSE2", defaultOptions | mathpresso::kOptionDisableSSE4_1 },
-      { "BEST", defaultOptions                                    }
+#if defined(_M_X64) || defined(__x86_64__) || defined(_M_IX86) || defined(__X86__) || defined(__i386__)
+      { "No-SSE4.1" , defaultOptions | mathpresso::kOptionDisableSSE4_1 },
+      { "No-AVX"    , defaultOptions | mathpresso::kOptionDisableAVX    },
+      { "No-AVX512" , defaultOptions | mathpresso::kOptionDisableAVX512 },
+#endif
+      { "Native"    , defaultOptions                                    }
     };
 
     printf("MPTest environment:\n");
@@ -463,14 +472,11 @@ struct TestApp {
     printf("  z = %f\n", (double)z);
     printf("  big = %f\n", (double)big);
 
-    for (size_t i = 0; i < MATHPRESSO_ARRAY_SIZE(tests); i++) {
-      const TestExpression& test = tests[i];
+    for (const TestExpression& test : tests) {
       const char* exp = test.expression;
       bool allOk = true;
 
-      for (size_t j = 0; j < MATHPRESSO_ARRAY_SIZE(options); j++) {
-        const TestOption& option = options[j];
-
+      for (const TestOption& option : options) {
         if (verbose) {
           printf("[Compile]:\n"
                  "  \"%s\" (%s)\n", exp, option.name);

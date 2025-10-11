@@ -96,40 +96,41 @@ Error AstOptimizer::on_unary_op(AstUnaryOp* node) {
     double value = child->value();
 
     switch (node->op_type()) {
-      case kOpNeg      : value = -value; break;
-      case kOpNot      : value = (value == 0); break;
+      case kOpNeg          : value = -value; break;
+      case kOpNot          : value = (value == 0); break;
 
-      case kOpIsNan    : value = mp_is_nan(value); break;
-      case kOpIsInf    : value = mp_is_inf(value); break;
-      case kOpIsFinite : value = mp_is_finite(value); break;
-      case kOpSignBit  : value = mp_sign_bit(value); break;
+      case kOpIsNan        : value = mp_is_nan(value); break;
+      case kOpIsInf        : value = mp_is_inf(value); break;
+      case kOpIsFinite     : value = mp_is_finite(value); break;
+      case kOpSignBit      : value = mp_sign_bit(value); break;
 
-      case kOpRound    : value = mp_round(value); break;
-      case kOpRoundEven: value = mp_round_even(value); break;
-      case kOpTrunc    : value = mp_trunc(value); break;
-      case kOpFloor    : value = mp_floor(value); break;
-      case kOpCeil     : value = mp_ceil(value); break;
+      case kOpTrunc        : value = mp_trunc(value); break;
+      case kOpFloor        : value = mp_floor(value); break;
+      case kOpCeil         : value = mp_ceil(value); break;
+      case kOpRoundEven    : value = mp_round_even(value); break;
+      case kOpRoundHalfAway: value = mp_round_half_away(value); break;
+      case kOpRoundHalfUp  : value = mp_round_half_up(value); break;
 
-      case kOpAbs      : value = mp_abs(value); break;
-      case kOpExp      : value = mp_exp(value); break;
-      case kOpLog      : value = mp_log(value); break;
-      case kOpLog2     : value = mp_log2(value); break;
-      case kOpLog10    : value = mp_log10(value); break;
-      case kOpSqrt     : value = mp_sqrt(value); break;
-      case kOpFrac     : value = mp_frac(value); break;
-      case kOpRecip    : value = mp_recip(value); break;
+      case kOpAbs          : value = mp_abs(value); break;
+      case kOpExp          : value = mp_exp(value); break;
+      case kOpLog          : value = mp_log(value); break;
+      case kOpLog2         : value = mp_log2(value); break;
+      case kOpLog10        : value = mp_log10(value); break;
+      case kOpSqrt         : value = mp_sqrt(value); break;
+      case kOpFrac         : value = mp_frac(value); break;
+      case kOpRecip        : value = mp_recip(value); break;
 
-      case kOpSin      : value = mp_sin(value); break;
-      case kOpCos      : value = mp_cos(value); break;
-      case kOpTan      : value = mp_tan(value); break;
+      case kOpSin          : value = mp_sin(value); break;
+      case kOpCos          : value = mp_cos(value); break;
+      case kOpTan          : value = mp_tan(value); break;
 
-      case kOpSinh     : value = mp_sinh(value); break;
-      case kOpCosh     : value = mp_cosh(value); break;
-      case kOpTanh     : value = mp_tanh(value); break;
+      case kOpSinh         : value = mp_sinh(value); break;
+      case kOpCosh         : value = mp_cosh(value); break;
+      case kOpTanh         : value = mp_tanh(value); break;
 
-      case kOpAsin     : value = mp_asin(value); break;
-      case kOpAcos     : value = mp_acos(value); break;
-      case kOpAtan     : value = mp_atan(value); break;
+      case kOpAsin         : value = mp_asin(value); break;
+      case kOpAcos         : value = mp_acos(value); break;
+      case kOpAtan         : value = mp_atan(value); break;
 
       default:
         return _error_reporter->on_error(kErrorInvalidState, node->position(),

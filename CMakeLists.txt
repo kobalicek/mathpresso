@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
 # Don't create a project if it was already created by another CMakeLists.txt.
 # This allows one library to embed another library without a project collision.
@@ -37,7 +37,7 @@ set(MATHPRESSO_PRIVATE_CFLAGS "")
 set(MATHPRESSO_PRIVATE_CFLAGS_DBG "")
 set(MATHPRESSO_PRIVATE_CFLAGS_REL "")
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC" OR "x${CMAKE_CXX_SIMULATE_ID}" STREQUAL "xMSVC")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC" OR "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xMSVC")
   set(MATHPRESSO_PRIVATE_LFLAGS "/OPT:REF /OPT:ICF")
 
   list(APPEND MATHPRESSO_PRIVATE_CFLAGS -MP)        # [+] Multi-process compilation
@@ -54,6 +54,9 @@ endif()
 
 if (NOT DEFINED ASMJIT_EMBED)
   set(ASMJIT_EMBED TRUE)
+endif()
+if (NOT DEFINED ASMJIT_NO_FOREIGN)
+  set(ASMJIT_NO_FOREIGN TRUE)
 endif()
 include("${ASMJIT_DIR}/CMakeLists.txt")
 

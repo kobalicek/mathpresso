@@ -4,8 +4,6 @@ MathPresso
 Mathematical Expression Parser And JIT Compiler.
 
   * [Official Repository (kobalicek/mathpresso)](https://github.com/kobalicek/mathpresso)
-  * [Official Blog (asmbits)] (https://asmbits.blogspot.com/ncr)
-  * [Official Chat (gitter)](https://gitter.im/kobalicek/mpsl)
   * [Permissive Zlib license](./LICENSE.md)
 
 
@@ -13,10 +11,6 @@ Introduction
 ------------
 
 MathPresso is a C++ library designed to parse mathematical expressions and compile them into machine code. It's much faster than traditional AST or byte-code based evaluators, because there is basically no overhead in the expression's execution. The JIT compiler is based on AsmJit and works on X86 and X64 architectures.
-
-This is an updated version of MathPresso that uses a stripped-off MPSL engine designed to work with scalar double precision floating points. It has many bugs fixed compared to the last version on google-code and contains improvements that can make execution of certain built-in functions (intrinsics) faster if the host CPU supports SSE4.1 (rounding, fraction, modulo, etc...).
-
-This is also a transitional version that is available to users that want to use MathPresso and cannot wait for the new MPSL engine, which is a work in progress.
 
 
 Features
@@ -40,16 +34,17 @@ Features
     * Lesser `x < y`
     * Lesser or equal `x <= y`
   * Functions defined by `add_builtins()`:
-    * Check for NaN `isnan(x)`
-    * Check for infinity `isinf(x)`
-    * Check for finite number `isfinite(x)`
-    * Get a sign bit `signbit(x)`
-    * Copy sign `copysign(x, y)`
-    * Round to nearest `round(x)`
-    * Round to even `roundeven(x)`
+    * Check for NaN `is_nan(x)`
+    * Check for infinity `is_inf(x)`
+    * Check for finite number `is_finite(x)`
+    * Get a sign bit `sign_bit(x)`
+    * Copy sign `copy_sign(x, y)`
     * Truncate `trunc(x)`
     * Floor `floor(x)`
     * Ceil `ceil(x)`
+    * Round to even `round_even(x)`
+    * Round half up `round_half_up(x)`
+    * Round half away `round_half_away(x)`
     * Average value `avg(x, y)`
     * Minimum value `min(x, y)`
     * Maximum value `max(x, y)`
