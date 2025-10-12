@@ -202,8 +202,7 @@ JitCompiler::JitCompiler(Arena& arena, ujit::BackendCompiler& cc, const CpuFeatu
 JitCompiler::~JitCompiler() {}
 
 void JitCompiler::begin_function() {
-  FuncNode* func_node = uc.cc->new_func(FuncSignature::build<void, double*, double*>(CallConvId::kCDecl));
-  uc.init_function(func_node);
+  FuncNode* func_node = uc.add_func(FuncSignature::build<void, double*, double*>(CallConvId::kCDecl));
 
   var_ptr = uc.new_gpz("var_ptr");
   result_ptr = uc.new_gpz("result_ptr");
@@ -214,7 +213,7 @@ void JitCompiler::begin_function() {
 }
 
 void JitCompiler::end_function() {
-  uc.cc->end_func();
+  uc.end_func();
   if (const_pool) {
     uc.cc->add_node(const_pool);
   }

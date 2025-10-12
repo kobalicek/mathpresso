@@ -10,7 +10,7 @@ Mathematical Expression Parser And JIT Compiler.
 Introduction
 ------------
 
-MathPresso is a C++ library designed to parse mathematical expressions and compile them into machine code. It's much faster than traditional AST or byte-code based evaluators, because there is basically no overhead in the expression's execution. The JIT compiler is based on AsmJit and works on X86 and X64 architectures.
+MathPresso is a C++ library designed to parse mathematical expressions and compile them into machine code at runtime. It's much faster than traditional AST or byte-code based evaluators, because there is basically no overhead in the expression's execution. The JIT compiler uses AsmJit and its UJIT framework to target X86, X86_64, and AArch64 architectures.
 
 
 Features
@@ -44,7 +44,7 @@ Features
     * Ceil `ceil(x)`
     * Round to even `round_even(x)`
     * Round half up `round_half_up(x)`
-    * Round half away `round_half_away(x)`
+    * Round half away from zero `round_half_away(x)`
     * Average value `avg(x, y)`
     * Minimum value `min(x, y)`
     * Maximum value `max(x, y)`
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  Data data(1.2, 3.8. 1.3);
+  Data data(1.2, 3.8, 1.3);
   printf("Output: %f\n", exp.evaluate(&data));
 
   return 0;
@@ -328,7 +328,7 @@ Build Dependencies
 Support
 -------
 
-MathPresso is an open-source library released under a permissive ZLIB license, which makes it possible to use it freely in any open-source or commercial product. Free support is available through issues and gitter channel.
+MathPresso is an open-source library released under a permissive Zlib license, which makes it possible to use it freely in any open-source or commercial product.
 
 
 Authors & Maintainers
