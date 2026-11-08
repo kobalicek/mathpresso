@@ -96,8 +96,8 @@ namespace mathpresso {
 using asmjit::String;
 using asmjit::StringTmp;
 
-using asmjit::Arena;
-using asmjit::ArenaVector;
+using asmjit::axl::Arena;
+using asmjit::axl::ArenaVector;
 
 // MathPresso OpType
 // =================
