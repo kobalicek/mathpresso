@@ -174,6 +174,12 @@ Error AstOptimizer::on_binary_op(AstBinaryOp* node) {
   bool l_is_imm = left->is_imm();
   bool r_is_imm = right->is_imm();
 
+  // A variable assigned a value which is not known at compile time is not a
+  // constant anymore - without this, a later read of a variable which held a
+  // constant before (`var n = 0; n = x;`) would still be folded to it.
+  if (op.is_assignment() && !r_is_imm && left->is_var())
+    static_cast<AstVar*>(left)->symbol()->clear_assigned();
+
   // If both nodes are values it's easy, just fold them into a single one.
   if (l_is_imm && r_is_imm) {
     AstImm* l_node = static_cast<AstImm*>(left);
