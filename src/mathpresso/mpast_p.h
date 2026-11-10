@@ -194,7 +194,7 @@ struct AstBuilder {
   template<typename T, typename... Args>
   MATHPRESSO_INLINE T* new_node(Args&&... args) {
     MATHPRESSO_ALLOC_AST_OBJECT(Arena::aligned_size_of<T>());
-    return new(obj) T(this, std::forward<Args>(args)...);
+    return new(obj) T(this, asmjit::axl::forward<Args>(args)...);
   }
 
 #undef MATHPRESSO_ALLOC_AST_OBJECT

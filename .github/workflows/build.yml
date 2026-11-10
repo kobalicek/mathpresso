@@ -13,79 +13,75 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { title: "linux/analyze-build"   , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=0", diagnostics: "analyze-build"}
-          - { title: "linux/asan"            , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "asan", }
-          - { title: "linux/ubsan"           , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "ubsan", }
-          - { title: "linux/hardened"        , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "hardened", }
-          - { title: "linux/valgrind"        , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "valgrind", }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-9"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-9"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-9"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-9"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-10"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-10"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-10"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-10"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-11"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-11"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-11"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-11"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-12"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-12"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-12"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-12"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-13"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-13"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-13"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-13"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-14"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "gcc-14"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-14"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "gcc-14"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-14", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-14", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-14", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-14", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-15", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-15", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-15", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-15", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-16", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-16", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-16", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-16", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-17", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-17", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-17", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-17", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-18", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-18", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-18", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-18", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x86"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04"    , arch: "x64"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04-arm", arch: "arm64"  , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "linux"                 , host: "ubuntu-24.04-arm", arch: "arm64"  , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "macos"                 , host: "macos-15-intel"  , arch: "x64"    , cc: "gcc-14"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "macos"                 , host: "macos-15-intel"  , arch: "x64"    , cc: "gcc-14"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "macos"                 , host: "macos-15-intel"  , arch: "x64"    , cc: "clang"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "macos"                 , host: "macos-15-intel"  , arch: "x64"    , cc: "clang"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "macos"                 , host: "macos-15"        , arch: "arm64"  , cc: "clang"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "macos"                 , host: "macos-15"        , arch: "arm64"  , cc: "clang"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "windows"               , host: "windows-2022"    , arch: "x86"    , cc: "vs2022"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "windows"               , host: "windows-2022"    , arch: "x86"    , cc: "vs2022"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "windows"               , host: "windows-2022"    , arch: "x64"    , cc: "vs2022"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "windows"               , host: "windows-2022"    , arch: "x64"    , cc: "vs2022"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "windows"               , host: "windows-11-arm"  , arch: "arm64"  , cc: "vs2022"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
-          - { title: "windows"               , host: "windows-11-arm"  , arch: "arm64"  , cc: "vs2022"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
-          - { title: "freebsd"               , host: "ubuntu-latest"   , arch: "x64"    , cc: "clang"   , conf: "Release", vm: "freebsd", vm_ver: "14.2", defs: "MATHPRESSO_TEST=1" }
-          - { title: "freebsd"               , host: "ubuntu-latest"   , arch: "arm64"  , cc: "clang"   , conf: "Release", vm: "freebsd", vm_ver: "14.2", defs: "MATHPRESSO_TEST=1" }
-          - { title: "netbsd"                , host: "ubuntu-latest"   , arch: "x64"    , cc: "clang"   , conf: "Release", vm: "netbsd" , vm_ver: "10.1", defs: "MATHPRESSO_TEST=1" }
-          - { title: "netbsd"                , host: "ubuntu-latest"   , arch: "arm64"  , cc: "clang"   , conf: "Release", vm: "netbsd" , vm_ver: "10.1", defs: "MATHPRESSO_TEST=1" }
-          - { title: "openbsd"               , host: "ubuntu-latest"   , arch: "x64"    , cc: "clang"   , conf: "Release", vm: "openbsd", vm_ver: "7.4" , defs: "MATHPRESSO_TEST=1" }
-          - { title: "openbsd"               , host: "ubuntu-latest"   , arch: "arm64"  , cc: "clang"   , conf: "Release", vm: "openbsd", vm_ver: "7.4" , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux/analyze-build"   , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Debug"  , defs: "MATHPRESSO_TEST=0", diagnostics: "analyze-build"}
+          - { title: "linux/asan"            , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "asan", }
+          - { title: "linux/ubsan"           , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "ubsan", }
+          - { title: "linux/hardened"        , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "hardened", }
+          - { title: "linux/valgrind"        , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1", diagnostics: "valgrind", }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-12"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-12"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-12"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-12"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-13"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-13"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-13"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-13"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-14"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-14"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-14"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-14"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-15"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-15"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-15"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-15"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-16"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "gcc-16"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-16"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "gcc-16"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04-arm"     , arch: "arm64"  , cc: "clang-19", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04-arm"     , arch: "arm64"  , cc: "clang-19", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "clang-20", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x86"    , cc: "clang-20", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "clang-20", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04"         , arch: "x64"    , cc: "clang-20", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04-arm"     , arch: "arm64"  , cc: "clang-20", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-24.04-arm"     , arch: "arm64"  , cc: "clang-20", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x86"    , cc: "clang-21", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x86"    , cc: "clang-21", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-21", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-21", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04-arm"     , arch: "arm64"  , cc: "clang-21", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04-arm"     , arch: "arm64"  , cc: "clang-21", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x86"    , cc: "clang-22", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x86"    , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04"         , arch: "x64"    , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04-arm"     , arch: "arm64"  , cc: "clang-22", conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "linux"                 , host: "ubuntu-26.04-arm"     , arch: "arm64"  , cc: "clang-22", conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-15-intel"       , arch: "x64"    , cc: "gcc-14"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-15-intel"       , arch: "x64"    , cc: "gcc-14"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-26-intel"       , arch: "x64"    , cc: "clang"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-26-intel"       , arch: "x64"    , cc: "clang"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-26"             , arch: "arm64"  , cc: "clang"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-26"             , arch: "arm64"  , cc: "clang"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-26"             , arch: "arm64e" , cc: "clang"   , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "macos"                 , host: "macos-26"             , arch: "arm64e" , cc: "clang"   , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "windows"               , host: "windows-2025-vs2026"  , arch: "x86"    , cc: "vs2026"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "windows"               , host: "windows-2025-vs2026"  , arch: "x86"    , cc: "vs2026"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "windows"               , host: "windows-2025-vs2026"  , arch: "x64"    , cc: "vs2026"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "windows"               , host: "windows-2025-vs2026"  , arch: "x64"    , cc: "vs2026"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "windows"               , host: "windows-11-vs2026-arm", arch: "arm64"  , cc: "vs2026"  , conf: "Debug"  , defs: "MATHPRESSO_TEST=1" }
+          - { title: "windows"               , host: "windows-11-vs2026-arm", arch: "arm64"  , cc: "vs2026"  , conf: "Release", defs: "MATHPRESSO_TEST=1" }
+          - { title: "freebsd"               , host: "ubuntu-latest"        , arch: "x64"    , cc: "clang"   , conf: "Release", vm: "freebsd", vm_ver: "15.1", defs: "MATHPRESSO_TEST=1" }
+          - { title: "freebsd"               , host: "ubuntu-latest"        , arch: "arm64"  , cc: "clang"   , conf: "Release", vm: "freebsd", vm_ver: "15.1", defs: "MATHPRESSO_TEST=1" }
+          - { title: "netbsd"                , host: "ubuntu-latest"        , arch: "x64"    , cc: "clang"   , conf: "Release", vm: "netbsd" , vm_ver: "11.0", defs: "MATHPRESSO_TEST=1" }
+          - { title: "netbsd"                , host: "ubuntu-latest"        , arch: "arm64"  , cc: "clang"   , conf: "Release", vm: "netbsd" , vm_ver: "11.0", defs: "MATHPRESSO_TEST=1" }
+          - { title: "openbsd"               , host: "ubuntu-latest"        , arch: "x64"    , cc: "clang"   , conf: "Release", vm: "openbsd", vm_ver: "7.9" , defs: "MATHPRESSO_TEST=1" }
+          - { title: "openbsd"               , host: "ubuntu-latest"        , arch: "arm64"  , cc: "clang"   , conf: "Release", vm: "openbsd", vm_ver: "7.9" , defs: "MATHPRESSO_TEST=1" }
 
     name: "${{matrix.title}}/${{matrix.arch}}, ${{matrix.cc}} ${{matrix.conf}}"
     runs-on: "${{matrix.host}}"
@@ -94,7 +90,7 @@ jobs:
       - name: "Checkout MathPresso"
         uses: actions/checkout@v5
         with:
-          path: "mathpresso"
+          path: "source"
 
       - name: "Checkout AsmJit"
         uses: actions/checkout@v5
@@ -113,18 +109,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: "Build & Test"
-        if: ${{!matrix.vm}}
-        run: python build-actions/action.py
-               --step=all
-               --compiler=${{matrix.cc}}
-               --architecture=${{matrix.arch}}
-               --source-dir=mathpresso
-               --config=mathpresso/.github/workflows/build-config.json
-               --build-type=${{matrix.conf}}
-               --build-defs=${{matrix.defs}}
-
-      - name: "Build & Test - Cross Platform Actions"
+      - name: "Install VM"
         if: ${{matrix.vm && matrix.vm_ver}}
         uses: cross-platform-actions/action@master
         with:
@@ -132,24 +117,77 @@ jobs:
           architecture: ${{matrix.arch}}
           version: ${{matrix.vm_ver}}
           sync_files: "runner-to-vm"
-          shutdown_vm: false
           shell: bash
-          run: |
-            set -e
 
-            PATH="/usr/sbin:/usr/pkg/sbin:/usr/pkg/bin:$PATH:$(pwd)/build-actions"
-            CI_NETBSD_USE_PKGIN=1
+      - name: "Install QEMU"
+        if: ${{matrix.vm && !matrix.vm_ver}}
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: linux/${{matrix.arch}}
 
-            export PATH
-            export CI_NETBSD_USE_PKGIN
+      - name: "Build & Test - Native"
+        if: ${{!matrix.vm}}
+        run: python build-actions/action.py
+               --source-dir=source
+               --config=source/.github/workflows/build-config.json
+               --compiler=${{matrix.cc}}
+               --diagnostics=${{matrix.diagnostics}}
+               --architecture=${{matrix.arch}}
+               --problem-matcher=auto
+               --build-type=${{matrix.conf}}
+               --build-defs="${{matrix.defs}}"
 
-            sh ./build-actions/prepare-environment.sh
-            python3 build-actions/action.py                           \
-              --source-dir=mathpresso                                 \
-              --config=mathpresso/.github/workflows/build-config.json \
-              --compiler=${{matrix.cc}}                               \
-              --diagnostics=${{matrix.diagnostics}}                   \
-              --architecture=${{matrix.arch}}                         \
-              --problem-matcher=auto                                  \
-              --build-type=${{matrix.conf}}                           \
-              --build-defs="${{matrix.defs}}"
+      - name: "Build & Test - Cross Platform Actions"
+        if: ${{matrix.vm && matrix.vm_ver}}
+        shell: cpa.sh {0}
+        run: |
+          set -e
+
+          PATH="/usr/sbin:/usr/pkg/sbin:/usr/pkg/bin:$PATH:$(pwd)/build-actions"
+          CI_NETBSD_USE_PKGIN=1
+
+          export PATH
+          export CI_NETBSD_USE_PKGIN
+
+          sh ./build-actions/prepare-environment.sh
+          python3 build-actions/action.py                        \
+            --source-dir=source                                  \
+            --config=source/.github/workflows/build-config.json  \
+            --compiler=${{matrix.cc}}                            \
+            --diagnostics=${{matrix.diagnostics}}                \
+            --architecture=${{matrix.arch}}                      \
+            --problem-matcher=auto                               \
+            --build-type=${{matrix.conf}}                        \
+            --build-defs="${{matrix.defs}}"
+
+      - name: "Build & Test - Docker + QEMU"
+        if: ${{matrix.vm && !matrix.vm_ver}}
+        run: |
+          docker run                                               \
+            --rm                                                   \
+            -v $(pwd):/${{github.workspace}}                       \
+            -w ${{github.workspace}}/build-actions                 \
+            --platform linux/${{matrix.arch}}                      \
+            ${{matrix.vm}}                                         \
+            bash action.sh                                         \
+            --source-dir=../source                                 \
+            --config=../source/.github/workflows/build-config.json \
+            --compiler=${{matrix.cc}}                              \
+            --diagnostics=${{matrix.diagnostics}}                  \
+            --architecture=${{matrix.arch}}                        \
+            --problem-matcher=auto                                 \
+            --build-type=${{matrix.conf}}                          \
+            --build-defs="${{matrix.defs}}"
+
+
+      - name: "Build & Test - Native"
+        if: ${{!matrix.vm}}
+        run: python build-actions/action.py
+               --source-dir=source
+               --config=source/.github/workflows/build-config.json
+               --compiler=${{matrix.cc}}
+               --diagnostics=${{matrix.diagnostics}}
+               --architecture=${{matrix.arch}}
+               --problem-matcher=auto
+               --build-type=${{matrix.conf}}
+               --build-defs=${{matrix.defs}}
