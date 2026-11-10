@@ -25,10 +25,16 @@ struct MyOutputLog : public mathpresso::OutputLog {
     (void)column;
     (void)size;
 
-    if (type == kMessageError)
-      printf("ERROR: %s\n", message);
-    else
-      printf("WARNING: %s\n", message);
+    const char* category_str = "";
+    switch (type) {
+      case kMessageError     : category_str = "[Error]\n"; break;
+      case kMessageWarning   : category_str = "[Warning]\n"; break;
+      case kMessageAstInitial: category_str = "[Ast-Parsed]\n"; break;
+      case kMessageAstFinal  : category_str = "[Ast-Optimized]\n"; break;
+      case kMessageAsm       : category_str = "[Machine-Code]\n"; break;
+    }
+
+    printf("%s%s\n", category_str, message);
   }
 };
 
