@@ -60,7 +60,7 @@ if (NOT DEFINED ASMJIT_NO_FOREIGN)
 endif()
 add_subdirectory("${ASMJIT_DIR}" asmjit)
 
-list(APPEND MATHPRESSO_DEPS asmjit::asmjit)
+list(APPEND MATHPRESSO_DEPS $<BUILD_INTERFACE:asmjit::asmjit>)
 list(APPEND MATHPRESSO_LIBS ${MATHPRESSO_DEPS})
 if (NOT MATHPRESSO_EMBED)
   list(INSERT MATHPRESSO_LIBS 0 mathpresso)
@@ -121,7 +121,7 @@ if (NOT MATHPRESSO_EMBED)
   target_compile_options(mathpresso PRIVATE ${MATHPRESSO_PRIVATE_CFLAGS}
     $<$<CONFIG:Debug>:${MATHPRESSO_PRIVATE_CFLAGS_DBG}>
     $<$<NOT:$<CONFIG:Debug>>:${MATHPRESSO_PRIVATE_CFLAGS_REL}>)
-  target_compile_features(mathpresso PUBLIC cxx_std_17)
+  target_compile_features(mathpresso PUBLIC cxx_std_20)
   set_property(TARGET mathpresso PROPERTY CXX_VISIBILITY_PRESET hidden)
 
   target_include_directories(mathpresso BEFORE PRIVATE ${ASMJIT_INCLUDE_DIRS})

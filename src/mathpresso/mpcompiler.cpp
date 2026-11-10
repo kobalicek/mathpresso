@@ -33,9 +33,7 @@ class JitErrorHandler : public ErrorHandler {
 public:
   asmjit::Error _err {};
 
-  void handle_error(asmjit::Error err, const char* message, asmjit::BaseEmitter* origin) override {
-    Support::maybe_unused(origin);
-
+  void handle_error(asmjit::Error err, const char* message, [[maybe_unused]] asmjit::BaseEmitter* origin) override {
     _err = err;
     fprintf(stderr, "AsmJit error: %s\n", message);
   }
